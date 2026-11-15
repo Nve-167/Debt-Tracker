@@ -5,8 +5,8 @@
 // ============================================================
 
 // ─── CONFIGURATION ───────────────────────────────────────────
-// ⚠️ ใส่ URL ของ Google Apps Script ที่ deploy แล้วตรงนี้
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNpZzGCT7jUpNR4BrJQyvXrTXzS-eAvtzX2DL_dD4DhBUXtm8VcMo4yCzNyQzEo2ID/exec'
+// ปิดการใช้ Google Sheet — ใช้ localStorage อย่างเดียว
+const SCRIPT_URL = ''
 
 // ─── DATE NORMALIZATION (ต้องอยู่ก่อน DB object) ─────────────
 // แปลง ISO date หรือ Date object เป็น 'YYYY-MM' format
