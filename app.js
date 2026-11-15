@@ -131,7 +131,12 @@ const DB = {
     const raw = localStorage.getItem('dt_payments');
     if (raw) {
       try { 
-        this._cache.payments = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        // Normalize period format (ISO date → YYYY-MM)
+        this._cache.payments = parsed.map(p => ({
+          ...p,
+          period: DateHelper.normalize(p.period)
+        }));
         return this._cache.payments;
       } catch { }
     }
@@ -142,9 +147,13 @@ const DB = {
     if (this.isOnline()) {
       const result = await apiCall('getPayments');
       if (result && Array.isArray(result)) {
-        this._cache.payments = result;
-        localStorage.setItem('dt_payments', JSON.stringify(result));
-        return result;
+        // Normalize period format (ISO date → YYYY-MM)
+        this._cache.payments = result.map(p => ({
+          ...p,
+          period: DateHelper.normalize(p.period)
+        }));
+        localStorage.setItem('dt_payments', JSON.stringify(this._cache.payments));
+        return this._cache.payments;
       }
     }
     return this.getPayments();
@@ -552,7 +561,8 @@ function genId(prefix = 'id') {
 const DateHelper = {
   toThai(ym) {
     if (!ym) return '-';
-    const [y, m] = ym.split('-');
+    const normalized = this.normalize(ym);
+    const [y, m] = normalized.split('-');
     return `${parseInt(m)}/${y}`;
   },
   currentYM() {
@@ -560,12 +570,29 @@ const DateHelper = {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   },
   addMonths(ym, n) {
-    const [y, m] = ym.split('-').map(Number);
+    const normalized = this.normalize(ym);
+    const [y, m] = normalized.split('-').map(Number);
     const d = new Date(y, m - 1 + n, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   },
   compare(a, b) {
-    return a < b ? -1 : a > b ? 1 : 0;
+    const na = this.normalize(a);
+    const nb = this.normalize(b);
+    return na < nb ? -1 : na > nb ? 1 : 0;
+  },
+  // แปลง ISO date หรือ Date object เป็น 'YYYY-MM' format
+  normalize(val) {
+    if (!val) return '';
+    // ถ้าเป็น 'YYYY-MM' อยู่แล้ว
+    if (typeof val === 'string' && /^\d{4}-\d{2}$/.test(val)) return val;
+    // ถ้าเป็น ISO string หรือ Date object
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return val;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    } catch {
+      return val;
+    }
   }
 };
 
