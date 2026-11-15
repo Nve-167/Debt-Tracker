@@ -8,6 +8,22 @@
 // ⚠️ ใส่ URL ของ Google Apps Script ที่ deploy แล้วตรงนี้
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNpZzGCT7jUpNR4BrJQyvXrTXzS-eAvtzX2DL_dD4DhBUXtm8VcMo4yCzNyQzEo2ID/exec'
 
+// ─── DATE NORMALIZATION (ต้องอยู่ก่อน DB object) ─────────────
+// แปลง ISO date หรือ Date object เป็น 'YYYY-MM' format
+function normalizePeriod(val) {
+  if (!val) return '';
+  // ถ้าเป็น 'YYYY-MM' อยู่แล้ว
+  if (typeof val === 'string' && /^\d{4}-\d{2}$/.test(val)) return val;
+  // ถ้าเป็น ISO string หรือ Date object
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return typeof val === 'string' ? val : '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  } catch {
+    return typeof val === 'string' ? val : '';
+  }
+}
+
 // ─── SEED DATA (fallback ถ้ายังไม่มีข้อมูล) ──────────────────
 const SEED_LOANS = [
   { id: 'loan_1', name: 'KT1800', originalAmount: 87413, currentBalance: 87413, monthlyPayment: 1800, interestRate: 20, color: '#2563eb', status: 'active', startDate: '2026-02', notes: '', createdAt: new Date().toISOString() },
@@ -79,7 +95,12 @@ const DB = {
     const raw = localStorage.getItem('dt_loans');
     if (raw) {
       try { 
-        this._cache.loans = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        // Normalize startDate format (ISO date → YYYY-MM)
+        this._cache.loans = parsed.map(l => ({
+          ...l,
+          startDate: normalizePeriod(l.startDate)
+        }));
         return this._cache.loans;
       } catch { }
     }
@@ -90,9 +111,13 @@ const DB = {
     if (this.isOnline()) {
       const result = await apiCall('getLoans');
       if (result && Array.isArray(result)) {
-        this._cache.loans = result;
-        localStorage.setItem('dt_loans', JSON.stringify(result));
-        return result;
+        // Normalize startDate format (ISO date → YYYY-MM)
+        this._cache.loans = result.map(l => ({
+          ...l,
+          startDate: normalizePeriod(l.startDate)
+        }));
+        localStorage.setItem('dt_loans', JSON.stringify(this._cache.loans));
+        return this._cache.loans;
       }
     }
     return this.getLoans();
@@ -135,7 +160,7 @@ const DB = {
         // Normalize period format (ISO date → YYYY-MM)
         this._cache.payments = parsed.map(p => ({
           ...p,
-          period: DateHelper.normalize(p.period)
+          period: normalizePeriod(p.period)
         }));
         return this._cache.payments;
       } catch { }
@@ -150,7 +175,7 @@ const DB = {
         // Normalize period format (ISO date → YYYY-MM)
         this._cache.payments = result.map(p => ({
           ...p,
-          period: DateHelper.normalize(p.period)
+          period: normalizePeriod(p.period)
         }));
         localStorage.setItem('dt_payments', JSON.stringify(this._cache.payments));
         return this._cache.payments;
@@ -561,7 +586,7 @@ function genId(prefix = 'id') {
 const DateHelper = {
   toThai(ym) {
     if (!ym) return '-';
-    const normalized = this.normalize(ym);
+    const normalized = normalizePeriod(ym);
     const [y, m] = normalized.split('-');
     return `${parseInt(m)}/${y}`;
   },
@@ -570,30 +595,18 @@ const DateHelper = {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   },
   addMonths(ym, n) {
-    const normalized = this.normalize(ym);
+    const normalized = normalizePeriod(ym);
     const [y, m] = normalized.split('-').map(Number);
     const d = new Date(y, m - 1 + n, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   },
   compare(a, b) {
-    const na = this.normalize(a);
-    const nb = this.normalize(b);
+    const na = normalizePeriod(a);
+    const nb = normalizePeriod(b);
     return na < nb ? -1 : na > nb ? 1 : 0;
   },
-  // แปลง ISO date หรือ Date object เป็น 'YYYY-MM' format
-  normalize(val) {
-    if (!val) return '';
-    // ถ้าเป็น 'YYYY-MM' อยู่แล้ว
-    if (typeof val === 'string' && /^\d{4}-\d{2}$/.test(val)) return val;
-    // ถ้าเป็น ISO string หรือ Date object
-    try {
-      const d = new Date(val);
-      if (isNaN(d.getTime())) return val;
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    } catch {
-      return val;
-    }
-  }
+  // Alias for backward compatibility
+  normalize: normalizePeriod
 };
 
 // ─── SYNC STATUS INDICATOR ───────────────────────────────────
