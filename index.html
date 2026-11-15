@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debt Tracker — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="emoji">💳</span>
+    Debt Tracker
+  </div>
+  <ul class="navbar-nav">
+    <li><a href="index.html" class="active">📊 <span class="label">Dashboard</span></a></li>
+    <li><a href="loans.html">🗂️ <span class="label">รายการ</span></a></li>
+    <li><a href="payment.html">✏️ <span class="label">บันทึกชำระ</span></a></li>
+    <li><a href="plan.html">🎯 <span class="label">วางแผนปิดหนี้</span></a></li>
+  </ul>
+</nav>
+
+<div class="container">
+
+  <!-- ── PAGE HEADER ── -->
+  <div class="page-header flex-between">
+    <div>
+      <div class="page-title">📊 Dashboard สรุปภาพรวม</div>
+      <div class="page-subtitle" id="dashboard-subtitle">กำลังโหลดข้อมูล...</div>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-outline btn-sm" onclick="exportSummary()">📥 Export</button>
+      <button class="btn btn-primary btn-sm" onclick="location.href='payment.html'">✏️ บันทึกชำระ</button>
+    </div>
+  </div>
+
+  <!-- ── STAT CARDS ── -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card red">
+      <div class="stat-label">คงเหลือรวม</div>
+      <div class="stat-value red" id="stat-total-balance">-</div>
+      <div class="stat-sub" id="stat-loans-count">-</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">ค่างวดรวม/เดือน</div>
+      <div class="stat-value orange" id="stat-total-payment">-</div>
+      <div class="stat-sub" id="stat-payment-sub">-</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">ดอกเบี้ยรวม/เดือน</div>
+      <div class="stat-value" id="stat-total-interest">-</div>
+      <div class="stat-sub" id="stat-interest-sub">-</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">ชำระแล้ว (เงินต้น)</div>
+      <div class="stat-value green" id="stat-total-paid">-</div>
+      <div class="stat-sub" id="stat-paid-sub">-</div>
+    </div>
+  </div>
+
+  <!-- ── TWO-COLUMN LAYOUT ── -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" id="main-grid">
+
+    <!-- ─ Overall Progress ─ -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📈 ความคืบหน้ารวม</div>
+        <span class="chip" id="overall-pct-chip">0%</span>
+      </div>
+      <div class="card-body">
+        <div class="progress-wrap mb-16">
+          <div class="progress-bar blue" id="overall-progress-bar" style="width:0%"></div>
+        </div>
+        <div id="overall-stats-detail"></div>
+      </div>
+    </div>
+
+    <!-- ─ Monthly Breakdown ─ -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📅 การชำระเดือนนี้</div>
+        <span class="chip" id="current-month-chip">-</span>
+      </div>
+      <div class="card-body" id="monthly-breakdown">
+        <div class="empty-state"><div class="emoji">📭</div><p>ยังไม่มีการชำระเดือนนี้</p></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── LOAN PROGRESS LIST ── -->
+  <div class="card mb-16" data-collapsible id="card-loan-progress">
+    <div class="card-header">
+      <div class="card-title">🏦 ความคืบหน้าแต่ละรายการ</div>
+      <div class="flex gap-8">
+        <select class="form-control" style="width:auto;font-size:13px;padding:5px 10px;" id="filter-status" onchange="renderLoanProgress()">
+          <option value="all">ทั้งหมด</option>
+          <option value="active">กำลังชำระ</option>
+          <option value="paid">ปิดแล้ว</option>
+        </select>
+      </div>
+    </div>
+    <div class="card-body" id="loan-progress-list">
+      <div class="empty-state"><div class="emoji">⏳</div><p>กำลังโหลด...</p></div>
+    </div>
+  </div>
+
+  <!-- ── MONTHLY SUMMARY ── -->
+  <div class="card mb-16" data-collapsible id="card-monthly-summary">
+    <div class="card-header">
+      <div class="card-title">📆 สรุปรายเดือน</div>
+      <span class="chip" id="monthly-summary-chip">-</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>เดือน</th>
+              <th class="text-right">รายการที่ชำระ</th>
+              <th class="text-right">ยอดจ่ายรวม</th>
+              <th class="text-right">ดอกเบี้ยรวม</th>
+              <th class="text-right">เงินต้นรวม</th>
+              <th class="text-right">คงเหลือ ณ สิ้นเดือน</th>
+            </tr>
+          </thead>
+          <tbody id="monthly-summary-body"></tbody>
+          <tfoot id="monthly-summary-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RECENT PAYMENTS ── -->
+  <div class="card mb-16" data-collapsible id="card-recent-payments">
+    <div class="card-header">
+      <div class="card-title">🕐 การชำระล่าสุด</div>
+      <a href="payment.html" class="btn btn-ghost btn-sm">ดูทั้งหมด →</a>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table id="recent-payments-table">
+          <thead>
+            <tr>
+              <th>เดือน</th>
+              <th>รายการ</th>
+              <th class="text-right">ค่างวด</th>
+              <th class="text-right">ดอกเบี้ย</th>
+              <th class="text-right">เงินต้น</th>
+              <th class="text-right">คงเหลือ</th>
+            </tr>
+          </thead>
+          <tbody id="recent-payments-body">
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-400)">ยังไม่มีรายการชำระ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAYOFF PROJECTION ── -->
+  <div class="card mb-16" data-collapsible id="card-projection">
+    <div class="card-header">
+      <div class="card-title">🎯 คาดการณ์ปิด</div>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>รายการ</th>
+              <th class="text-right">คงเหลือ</th>
+              <th class="text-right">ค่างวด/เดือน</th>
+              <th class="text-right">ดอกเบี้ย (%/ปี)</th>
+              <th class="text-right">เดือนที่เหลือ</th>
+              <th>คาดปิด</th>
+            </tr>
+          </thead>
+          <tbody id="projection-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INTEREST ANALYSIS ── -->
+  <div class="card" data-collapsible id="card-interest-analysis">
+    <div class="card-header">
+      <div class="card-title">💡 วิเคราะห์ดอกเบี้ย (เดือนปัจจุบัน)</div>
+    </div>
+    <div class="card-body" id="interest-analysis">
+      <div class="empty-state"><div class="emoji">📊</div><p>กำลังคำนวณ...</p></div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ── RESET CONFIRM MODAL ── -->
+<div class="modal-overlay" id="modal-reset">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ รีเซ็ตข้อมูลทั้งหมด</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-reset')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-danger">ข้อมูลการชำระทั้งหมดจะถูกลบและรีเซ็ตกลับไปยังข้อมูลเริ่มต้น</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-reset')">ยกเลิก</button>
+      <button class="btn btn-danger" onclick="doReset()">รีเซ็ต</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+<script>
+// ─── PAGE INIT ────────────────────────────────────────────────
+function pageInit() {
+  renderDashboard();
+  initCollapsibles();
+}
+
+// ─── COLLAPSIBLE CARDS ───────────────────────────────────────
+const COLLAPSE_KEY = 'dt_collapsed_cards';
+
+function getCollapsedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY)) || []); }
+  catch { return new Set(); }
+}
+function saveCollapsedSet(set) {
+  localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...set]));
+}
+
+function initCollapsibles() {
+  const collapsed = getCollapsedSet();
+
+  document.querySelectorAll('.card[data-collapsible]').forEach(card => {
+    const header = card.querySelector('.card-header');
+    if (!header) return;
+
+    // เพิ่มปุ่มลูกศร (ครั้งเดียว)
+    if (!header.querySelector('.collapse-toggle')) {
+      const btn = document.createElement('button');
+      btn.className = 'collapse-toggle';
+      btn.setAttribute('aria-label', 'ย่อ/ขยาย');
+      btn.textContent = '▼';
+      header.appendChild(btn);
+    }
+
+    // คืนสถานะที่จำไว้
+    if (card.id && collapsed.has(card.id)) card.classList.add('is-collapsed');
+
+    // คลิกที่ header เพื่อ toggle — ยกเว้นคลิกที่ตัวควบคุมอื่น (select, a, input, ปุ่มอื่น)
+    header.addEventListener('click', (e) => {
+      const interactive = e.target.closest('select, a, input, label, .btn:not(.collapse-toggle)');
+      if (interactive) return;
+      toggleCard(card);
+    });
+  });
+}
+
+function toggleCard(card) {
+  card.classList.toggle('is-collapsed');
+  const collapsed = getCollapsedSet();
+  if (!card.id) return;
+  if (card.classList.contains('is-collapsed')) collapsed.add(card.id);
+  else collapsed.delete(card.id);
+  saveCollapsedSet(collapsed);
+}
+
+// ─── MAIN RENDER ─────────────────────────────────────────────
+function renderDashboard() {
+  const loans    = DB.getLoans() || [];
+  const payments = DB.getPayments() || [];
+  const currentYM = DateHelper.currentYM();
+
+  // ── Stats ──
+  const activeLoans   = loans.filter(l => l.status === 'active');
+  const totalBalance  = Calc.sum(activeLoans, 'currentBalance');
+  const totalPayment  = Calc.sum(activeLoans, 'monthlyPayment');
+  const totalOriginal = Calc.sum(loans, 'originalAmount');
+  const totalInterestNow = activeLoans.reduce((s, l) =>
+    s + Calc.monthlyInterest(l.currentBalance, l.interestRate), 0);
+
+  // total principal paid across all payment records
+  const totalPrincipalPaid = payments.reduce((s, p) => s + (Number(p.principal) || 0), 0);
+
+  document.getElementById('stat-total-balance').textContent = '฿' + Calc.fmt(totalBalance);
+  document.getElementById('stat-loans-count').textContent   = `${activeLoans.length} รายการที่ยังชำระ`;
+  document.getElementById('stat-total-payment').textContent = '฿' + Calc.fmt(totalPayment);
+  document.getElementById('stat-payment-sub').textContent   = `ดอกเบี้ย ฿${Calc.fmt(totalInterestNow)}/เดือน`;
+  document.getElementById('stat-total-interest').textContent = '฿' + Calc.fmt(totalInterestNow);
+  const interestPct = totalPayment > 0 ? (totalInterestNow / totalPayment * 100).toFixed(1) : 0;
+  document.getElementById('stat-interest-sub').textContent  = `${interestPct}% ของค่างวดรวม`;
+  document.getElementById('stat-total-paid').textContent    = '฿' + Calc.fmt(totalPrincipalPaid);
+  document.getElementById('stat-paid-sub').textContent      = `${payments.length} รายการที่บันทึก`;
+
+  document.getElementById('dashboard-subtitle').textContent =
+    `อัปเดต: ${new Date().toLocaleDateString('th-TH', {day:'numeric',month:'long',year:'numeric'})}`;
+
+  // ── Overall Progress ──
+  const overallPct = totalOriginal > 0
+    ? Math.min(((totalOriginal - totalBalance) / totalOriginal * 100), 100).toFixed(1)
+    : 0;
+  document.getElementById('overall-pct-chip').textContent = overallPct + '%';
+  document.getElementById('overall-progress-bar').style.width = overallPct + '%';
+  document.getElementById('overall-stats-detail').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <div class="text-xs text-muted">ต้นทุนเริ่มต้น</div>
+        <div class="fw-700" style="font-size:15px">฿${Calc.fmt(totalOriginal)}</div>
+      </div>
+      <div>
+        <div class="text-xs text-muted">ชำระไปแล้ว</div>
+        <div class="fw-700" style="font-size:15px;color:var(--success)">฿${Calc.fmt(totalOriginal - totalBalance)}</div>
+      </div>
+      <div>
+        <div class="text-xs text-muted">คงเหลือ</div>
+        <div class="fw-700" style="font-size:15px;color:var(--danger)">฿${Calc.fmt(totalBalance)}</div>
+      </div>
+      <div>
+        <div class="text-xs text-muted">รายการปิดแล้ว</div>
+        <div class="fw-700" style="font-size:15px">
+          ${loans.filter(l=>l.status==='paid').length}/${loans.length}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // ── Monthly breakdown ──
+  document.getElementById('current-month-chip').textContent = DateHelper.toThai(currentYM);
+  const monthPayments = payments.filter(p => p.period === currentYM);
+  const monthlyEl = document.getElementById('monthly-breakdown');
+  if (monthPayments.length === 0) {
+    monthlyEl.innerHTML = `<div class="empty-state"><div class="emoji">📭</div><p>ยังไม่มีการชำระเดือนนี้</p><a href="payment.html" class="btn btn-primary btn-sm mt-12">+ บันทึกการชำระ</a></div>`;
+  } else {
+    const mTotal  = monthPayments.reduce((s,p) => s + (p.amount||0), 0);
+    const mInt    = monthPayments.reduce((s,p) => s + (p.interest||0), 0);
+    const mPrin   = monthPayments.reduce((s,p) => s + (p.principal||0), 0);
+    monthlyEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div><div class="text-xs text-muted">จ่ายรวม</div><div class="fw-700" style="font-size:15px">฿${Calc.fmt(mTotal)}</div></div>
+        <div><div class="text-xs text-muted">ดอกเบี้ย</div><div class="fw-700" style="font-size:15px;color:var(--danger)">฿${Calc.fmt(mInt)}</div></div>
+        <div><div class="text-xs text-muted">เงินต้น</div><div class="fw-700" style="font-size:15px;color:var(--success)">฿${Calc.fmt(mPrin)}</div></div>
+        <div><div class="text-xs text-muted">รายการ</div><div class="fw-700" style="font-size:15px">${monthPayments.length}/${activeLoans.length}</div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar green" style="width:${(monthPayments.length/Math.max(activeLoans.length,1)*100).toFixed(0)}%"></div>
+      </div>
+      <div class="text-xs text-muted mt-8">ชำระแล้ว ${monthPayments.length} จาก ${activeLoans.length} รายการ</div>
+    `;
+  }
+
+  renderLoanProgress();
+  renderMonthlySummary();
+  renderRecentPayments();
+  renderProjection();
+  renderInterestAnalysis();
+}
+
+// ─── MONTHLY SUMMARY ─────────────────────────────────────────
+function renderMonthlySummary() {
+  const payments = DB.getPayments() || [];
+  const tbody = document.getElementById('monthly-summary-body');
+  const tfoot = document.getElementById('monthly-summary-foot');
+  const chip  = document.getElementById('monthly-summary-chip');
+
+  if (payments.length === 0) {
+    chip.textContent = 'ยังไม่มีข้อมูล';
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-400)">ยังไม่มีการชำระ — <a href="payment.html" style="color:var(--primary)">เริ่มบันทึก</a></td></tr>`;
+    tfoot.innerHTML = '';
+    return;
+  }
+
+  // group payments by period
+  const byPeriod = {};
+  payments.forEach(p => {
+    (byPeriod[p.period] = byPeriod[p.period] || []).push(p);
+  });
+
+  const periods = Object.keys(byPeriod).sort(DateHelper.compare);
+
+  // ยอดคงเหลือ ณ สิ้นเดือน = ผลรวม balanceAfter ล่าสุดของแต่ละ loan ที่ period <= เดือนนั้น
+  // (carry-forward loan ที่ไม่มีการชำระในเดือนนั้น)
+  function totalBalanceAtEndOf(period) {
+    const latestPerLoan = {};
+    payments.forEach(p => {
+      if (DateHelper.compare(p.period, period) <= 0) {
+        const cur = latestPerLoan[p.loanId];
+        if (!cur || DateHelper.compare(p.period, cur.period) > 0 ||
+            (p.period === cur.period && new Date(p.createdAt) >= new Date(cur.createdAt))) {
+          latestPerLoan[p.loanId] = p;
+        }
+      }
+    });
+    return Object.values(latestPerLoan).reduce((s, p) => s + (Number(p.balanceAfter) || 0), 0);
+  }
+
+  let grandAmt = 0, grandInt = 0, grandPrin = 0;
+
+  tbody.innerHTML = periods.map(period => {
+    const rows = byPeriod[period];
+    const amt  = rows.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
+    const int  = rows.reduce((s, p) => s + (Number(p.interest)  || 0), 0);
+    const prin = rows.reduce((s, p) => s + (Number(p.principal) || 0), 0);
+    const endBal = totalBalanceAtEndOf(period);
+    grandAmt += amt; grandInt += int; grandPrin += prin;
+
+    const prinCls = prin >= 0 ? 'green-text' : 'red-text';
+    return `
+      <tr>
+        <td class="fw-600">${DateHelper.toThai(period)}</td>
+        <td class="num">${rows.length} รายการ</td>
+        <td class="num fw-600">฿${Calc.fmt(amt)}</td>
+        <td class="num red-text">฿${Calc.fmt(int)}</td>
+        <td class="num ${prinCls}">฿${Calc.fmt(prin)}</td>
+        <td class="num">฿${Calc.fmt(endBal)}</td>
+      </tr>`;
+  }).join('');
+
+  const grandPrinCls = grandPrin >= 0 ? 'green-text' : 'red-text';
+  tfoot.innerHTML = `
+    <tr style="background:var(--gray-50);border-top:2px solid var(--gray-300)">
+      <td class="fw-700" style="padding:10px 14px">รวม ${periods.length} เดือน</td>
+      <td class="num fw-700">${payments.length} รายการ</td>
+      <td class="num fw-700">฿${Calc.fmt(grandAmt)}</td>
+      <td class="num fw-700 red-text">฿${Calc.fmt(grandInt)}</td>
+      <td class="num fw-700 ${grandPrinCls}">฿${Calc.fmt(grandPrin)}</td>
+      <td class="num"></td>
+    </tr>`;
+
+  chip.textContent = `${periods.length} เดือน`;
+}
+
+// ─── LOAN PROGRESS LIST ───────────────────────────────────────
+function renderLoanProgress() {
+  const loans    = DB.getLoans() || [];
+  const filterVal = document.getElementById('filter-status').value;
+  const el = document.getElementById('loan-progress-list');
+
+  const filtered = filterVal === 'all' ? loans : loans.filter(l => l.status === filterVal);
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="emoji">🎉</div><p>ไม่มีรายการในหมวดนี้</p></div>`;
+    return;
+  }
+
+  // Sort: active first, then by balance desc
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+    return b.currentBalance - a.currentBalance;
+  });
+
+  el.innerHTML = sorted.map(loan => {
+    const pct     = Calc.progressPct(loan.originalAmount, loan.currentBalance);
+    const intNow  = Calc.monthlyInterest(loan.currentBalance, loan.interestRate);
+    const months  = Calc.monthsToPayoff(loan.currentBalance, loan.monthlyPayment, loan.interestRate);
+    const barColor = loan.status === 'paid' ? 'green' : pct > 50 ? 'blue' : 'orange';
+    const statusBadge = loan.status === 'paid'
+      ? `<span class="badge badge-paid">✅ ปิดแล้ว</span>`
+      : `<span class="badge badge-active">🔵 กำลังชำระ</span>`;
+
+    return `
+    <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--gray-100);">
+      <div class="flex-between mb-8">
+        <div class="flex gap-8" style="align-items:center">
+          <div style="width:10px;height:10px;border-radius:50%;background:${loan.color};flex-shrink:0"></div>
+          <div style="font-size:14px;font-weight:700;color:var(--gray-800)">${loan.name}</div>
+          ${statusBadge}
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--danger)">฿${Calc.fmt(loan.currentBalance)}</div>
+      </div>
+      <div class="loan-progress-label">
+        <span>ชำระไปแล้ว ${pct.toFixed(1)}%</span>
+        <span style="color:var(--gray-700)">จาก ฿${Calc.fmt(loan.originalAmount)}</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar ${barColor}" style="width:${pct}%"></div>
+      </div>
+      <div class="flex gap-16 mt-8" style="font-size:12px;color:var(--gray-400)">
+        <span>💰 งวด ฿${Calc.fmt(loan.monthlyPayment, 0)}</span>
+        <span>📈 ดบ. ฿${Calc.fmt(intNow, 0)}/เดือน</span>
+        ${months ? `<span>⏳ อีก ${months} เดือน</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // remove last border
+  const items = el.querySelectorAll('[style*="border-bottom"]');
+  if (items.length > 0) items[items.length - 1].style.borderBottom = 'none';
+}
+
+// ─── RECENT PAYMENTS ─────────────────────────────────────────
+function renderRecentPayments() {
+  const payments = DB.getPayments() || [];
+  const loans    = DB.getLoans() || [];
+  const loanMap  = Object.fromEntries(loans.map(l => [l.id, l]));
+  const tbody    = document.getElementById('recent-payments-body');
+
+  if (payments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-400)">ยังไม่มีรายการชำระ — <a href="payment.html" style="color:var(--primary)">บันทึกเลย</a></td></tr>`;
+    return;
+  }
+
+  const recent = [...payments]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 15);
+
+  tbody.innerHTML = recent.map(p => {
+    const loan = loanMap[p.loanId];
+    const name = loan ? loan.name : p.loanId;
+    const principal = Number(p.principal);
+    const principalClass = principal >= 0 ? 'green-text' : 'red-text';
+    return `
+      <tr>
+        <td>${DateHelper.toThai(p.period)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${loan ? `<div style="width:8px;height:8px;border-radius:50%;background:${loan.color}"></div>` : ''}
+            <span class="fw-600">${name}</span>
+          </div>
+        </td>
+        <td class="num">฿${Calc.fmt(p.amount)}</td>
+        <td class="num red-text">฿${Calc.fmt(p.interest)}</td>
+        <td class="num ${principalClass}">฿${Calc.fmt(p.principal)}</td>
+        <td class="num">฿${Calc.fmt(p.balanceAfter)}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ─── PAYOFF PROJECTION ───────────────────────────────────────
+function renderProjection() {
+  const loans   = DB.getLoans() || [];
+  const current = DateHelper.currentYM();
+  const tbody   = document.getElementById('projection-body');
+
+  const active = loans.filter(l => l.status === 'active' && l.currentBalance > 0);
+
+  if (active.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray-400)">🎉 ไม่มียอดคงค้าง!</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = active.map(loan => {
+    const months = Calc.monthsToPayoff(loan.currentBalance, loan.monthlyPayment, loan.interestRate);
+    const payoffYM = months ? DateHelper.addMonths(current, months) : null;
+    const payoffDisplay = payoffYM ? DateHelper.toThai(payoffYM) : '—';
+    const urgency = months && months <= 12 ? 'green-text' : months && months <= 24 ? '' : 'red-text';
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:8px;height:8px;border-radius:50%;background:${loan.color}"></div>
+            <span class="fw-600">${loan.name}</span>
+          </div>
+        </td>
+        <td class="num">฿${Calc.fmt(loan.currentBalance)}</td>
+        <td class="num">฿${Calc.fmt(loan.monthlyPayment, 0)}</td>
+        <td class="num">${loan.interestRate > 0 ? loan.interestRate.toFixed(2) + '%' : '—'}</td>
+        <td class="num ${urgency}">${months ? months + ' เดือน' : '—'}</td>
+        <td class="${urgency}">${payoffDisplay}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ─── INTEREST ANALYSIS ───────────────────────────────────────
+function renderInterestAnalysis() {
+  const loans  = DB.getLoans() || [];
+  const active = loans.filter(l => l.status === 'active' && l.currentBalance > 0);
+  const el     = document.getElementById('interest-analysis');
+
+  if (active.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="emoji">🎉</div><p>ไม่มียอดคงค้าง!</p></div>`;
+    return;
+  }
+
+  const withInterest = active
+    .map(l => ({ ...l, intAmt: Calc.monthlyInterest(l.currentBalance, l.interestRate) }))
+    .sort((a, b) => b.intAmt - a.intAmt);
+
+  const totalInt    = withInterest.reduce((s, l) => s + l.intAmt, 0);
+  const totalPayment = Calc.sum(active, 'monthlyPayment');
+
+  el.innerHTML = `
+    <div class="alert alert-warning" style="margin-bottom:16px">
+      💡 ดอกเบี้ยรวมเดือนนี้ <strong>฿${Calc.fmt(totalInt)}</strong>
+      คิดเป็น <strong>${totalPayment > 0 ? (totalInt/totalPayment*100).toFixed(1) : 0}%</strong> ของค่างวดทั้งหมด
+    </div>
+    <div style="display:grid;gap:10px">
+      ${withInterest.map((l, i) => {
+        const pct = totalInt > 0 ? (l.intAmt / totalInt * 100).toFixed(1) : 0;
+        return `
+        <div>
+          <div class="flex-between text-sm mb-8">
+            <div class="flex gap-8" style="align-items:center">
+              <span style="font-size:12px;font-weight:700;color:var(--gray-400);width:18px">${i+1}</span>
+              <div style="width:8px;height:8px;border-radius:50%;background:${l.color}"></div>
+              <span class="fw-600">${l.name}</span>
+            </div>
+            <div class="flex gap-12">
+              <span style="color:var(--danger);font-weight:600">฿${Calc.fmt(l.intAmt)}</span>
+              <span class="text-muted">${pct}%</span>
+            </div>
+          </div>
+          <div class="progress-wrap" style="height:6px">
+            <div class="progress-bar red" style="width:${pct}%;background:${l.color}"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ─── EXPORT ──────────────────────────────────────────────────
+function exportSummary() {
+  const loans    = DB.getLoans() || [];
+  const payments = DB.getPayments() || [];
+  const data = {
+    exportDate: new Date().toLocaleString('th-TH'),
+    loans: loans.map(l => ({
+      name: l.name,
+      originalAmount: l.originalAmount,
+      currentBalance: l.currentBalance,
+      monthlyPayment: l.monthlyPayment,
+      status: l.status
+    })),
+    recentPayments: payments.slice(-30)
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `debt-summary-${DateHelper.currentYM()}.json`;
+  a.click();
+  toast('Export สำเร็จ', 'success');
+}
+
+// ─── RESET ───────────────────────────────────────────────────
+function doReset() {
+  DB.reset();
+  closeModal('modal-reset');
+  toast('รีเซ็ตข้อมูลเรียบร้อย', 'warning');
+  renderDashboard();
+}
+</script>
+</body>
+</html>

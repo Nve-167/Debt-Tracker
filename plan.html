@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debt Tracker — วางแผนปิดหนี้</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="emoji">💳</span>
+    Debt Tracker
+  </div>
+  <ul class="navbar-nav">
+    <li><a href="index.html">📊 <span class="label">Dashboard</span></a></li>
+    <li><a href="loans.html">🗂️ <span class="label">รายการหนี้</span></a></li>
+    <li><a href="payment.html">✏️ <span class="label">บันทึกชำระ</span></a></li>
+    <li><a href="plan.html" class="active">🎯 <span class="label">วางแผนปิดหนี้</span></a></li>
+  </ul>
+</nav>
+
+<div class="container">
+
+  <!-- ── PAGE HEADER ── -->
+  <div class="page-header flex-between">
+    <div>
+      <div class="page-title">🎯 วางแผนปิดหนี้</div>
+      <div class="page-subtitle" id="plan-subtitle">คำนวณจากยอดหนี้ปัจจุบัน</div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div class="card mb-16">
+    <div class="card-header">
+      <div class="card-title">⚙️ ตั้งค่าแผน</div>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>เดือนที่เริ่มแผน</label>
+          <input class="form-control" type="month" id="plan-start" />
+        </div>
+        <div class="form-group">
+          <label>งบชำระต่อเดือน (บาท)</label>
+          <input class="form-control" type="number" id="plan-budget" value="25000" step="500" />
+          <div class="form-hint">ต้อง ≥ ค่างวดขั้นต่ำรวม</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>กลยุทธ์การโปะ</label>
+        <select class="form-control" id="plan-strategy" onchange="onStrategyChange()">
+          <option value="avalanche">Avalanche — ถล่มดอกสูงสุดก่อน (ประหยัดดอกที่สุด)</option>
+          <option value="snowball">Snowball — ถล่มยอดเล็กสุดก่อน (เห็นผลเร็ว กำลังใจดี)</option>
+          <option value="custom">กำหนดลำดับเอง — จัดลำดับก้อนที่จะโปะก่อน-หลัง</option>
+        </select>
+      </div>
+
+      <!-- ลำดับโปะแบบกำหนดเอง -->
+      <div class="form-group" id="custom-order-group" style="display:none">
+        <label>ลำดับการโปะ (บนสุด = โปะก่อน)</label>
+        <div id="custom-order-list"></div>
+        <div class="form-hint">ใช้ปุ่ม ▲▼ จัดลำดับก้อนที่จะทุ่มเงินโปะก่อน จ่ายขั้นต่ำครบทุกก้อนเหมือนเดิม</div>
+      </div>
+
+      <div class="form-group">
+        <label>เงินโปะพิเศษ (โบนัส/เงินก้อน)</label>
+        <div id="extra-list"></div>
+        <button class="btn btn-outline btn-sm mt-8" onclick="addExtraRow()">+ เพิ่มเงินโปะ</button>
+        <div class="form-hint">ระบุเดือนและจำนวนเงินก้อนที่จะโปะเพิ่มในเดือนนั้น</div>
+      </div>
+
+      <div class="form-group">
+        <label>หนี้ที่รวมในแผน</label>
+        <div id="loan-select-list" class="flex gap-8" style="flex-wrap:wrap"></div>
+        <div class="form-hint">เอาติ๊กออกสำหรับก้อนที่ไม่ต้องการวางแผน เช่น บัญชีหมุนเงิน</div>
+      </div>
+
+      <div class="flex gap-8">
+        <button class="btn btn-primary btn-lg" style="flex:1" onclick="runPlan()">🧮 คำนวณแผน</button>
+        <button class="btn btn-outline btn-lg" onclick="resetPlanSettings()" title="ล้างการตั้งค่ากลับค่าเริ่มต้น">↺ รีเซ็ต</button>
+      </div>
+      <div class="form-hint mt-8">💾 การตั้งค่า (งบ, กลยุทธ์, ลำดับโปะ, เงินโปะ) จะถูกบันทึกอัตโนมัติ</div>
+    </div>
+  </div>
+
+  <!-- ── RESULT: SUMMARY ── -->
+  <div class="stats-grid" id="plan-stats" style="display:none">
+    <div class="stat-card red">
+      <div class="stat-label">หนี้รวมตั้งต้น</div>
+      <div class="stat-value red" id="ps-total">-</div>
+      <div class="stat-sub" id="ps-count">-</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">ดอกเบี้ยรวมที่จ่าย</div>
+      <div class="stat-value orange" id="ps-interest">-</div>
+      <div class="stat-sub">ตลอดแผน</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">ปิดหนี้ครบ</div>
+      <div class="stat-value green" id="ps-payoff">-</div>
+      <div class="stat-sub" id="ps-months">-</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">ค่างวดขั้นต่ำรวม</div>
+      <div class="stat-value" id="ps-min">-</div>
+      <div class="stat-sub" id="ps-free">-</div>
+    </div>
+  </div>
+
+  <!-- ── RESULT: WARNING ── -->
+  <div id="plan-warning"></div>
+
+  <!-- ── RESULT: PAYOFF ORDER ── -->
+  <div class="card mb-16" id="card-order" style="display:none">
+    <div class="card-header">
+      <div class="card-title">🏁 ลำดับการปิดหนี้</div>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ลำดับ</th>
+              <th>รายการ</th>
+              <th class="text-right">ยอดตั้งต้น</th>
+              <th class="text-right">ดอกเบี้ย (%/ปี)</th>
+              <th>คาดปิด</th>
+            </tr>
+          </thead>
+          <tbody id="order-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RESULT: PER-LOAN MATRIX ── -->
+  <div class="card mb-16" id="card-matrix" style="display:none">
+    <div class="card-header">
+      <div class="card-title">🔍 รายละเอียดแต่ละก้อน รายเดือน</div>
+      <div class="flex gap-12" style="align-items:center;flex-wrap:wrap">
+        <span id="matrix-legend" class="text-xs" style="display:none">
+          <span style="color:var(--gray-700)">ค่างวด</span>
+          <span style="color:var(--success);font-weight:700;margin-left:8px">+โปะจากงบเดือน</span>
+          <span style="color:#e6a700;font-weight:700;margin-left:8px">+โปะพิเศษ</span>
+        </span>
+        <select class="form-control" style="width:auto;font-size:13px;padding:5px 10px" id="matrix-mode" onchange="renderMatrix()">
+          <option value="balance">ยอดคงเหลือ ณ สิ้นเดือน</option>
+          <option value="paid">ยอดที่จ่ายในเดือนนั้น</option>
+          <option value="interest">ดอกเบี้ยในเดือนนั้น</option>
+        </select>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap" style="max-height:520px;overflow:auto">
+        <table id="matrix-table">
+          <thead id="matrix-head"></thead>
+          <tbody id="matrix-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RESULT: MONTHLY SCHEDULE ── -->
+  <div class="card mb-16" id="card-schedule" style="display:none">
+    <div class="card-header">
+      <div class="card-title">📅 ตารางจ่ายรายเดือน</div>
+      <span class="chip" id="schedule-chip">-</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>เดือน</th>
+              <th class="text-right">งบเดือนนี้</th>
+              <th class="text-right">จ่ายขั้นต่ำ</th>
+              <th class="text-right">โปะเพิ่ม</th>
+              <th>ทุ่มโปะที่ก้อน</th>
+              <th class="text-right">หนี้คงเหลือ</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div id="toast-container"></div>
+<script src="app.js"></script>
+<script>
+// ─── SAVE / LOAD SETTINGS ────────────────────────────────────
+const PLAN_KEY = 'dt_plan_settings';
+
+function savePlanSettings() {
+  const settings = {
+    start:    document.getElementById('plan-start').value,
+    budget:   document.getElementById('plan-budget').value,
+    strategy: document.getElementById('plan-strategy').value,
+    extras:   readExtras(),
+    excluded: [...document.querySelectorAll('.loan-include:not(:checked)')].map(c => c.value),
+    customOrder
+  };
+  localStorage.setItem(PLAN_KEY, JSON.stringify(settings));
+}
+
+function loadPlanSettings() {
+  try { return JSON.parse(localStorage.getItem(PLAN_KEY)); } catch { return null; }
+}
+
+function resetPlanSettings() {
+  localStorage.removeItem(PLAN_KEY);
+  customOrder = [];
+  document.getElementById('extra-list').innerHTML = '';
+  location.reload();
+}
+
+// ─── PAGE INIT ───────────────────────────────────────────────
+function pageInit() {
+  const saved = loadPlanSettings();
+
+  // เริ่ม/งบ/กลยุทธ์
+  document.getElementById('plan-start').value = (saved && saved.start) || DateHelper.currentYM();
+  if (saved && saved.budget)   document.getElementById('plan-budget').value   = saved.budget;
+  if (saved && saved.strategy) document.getElementById('plan-strategy').value = saved.strategy;
+
+  // เงินโปะ: ใช้ที่บันทึกไว้ ถ้าไม่มีใช้ default
+  if (saved && saved.extras && Object.keys(saved.extras).length) {
+    Object.entries(saved.extras).forEach(([period, amount]) => addExtraRow(period, amount));
+  } else {
+    const y = new Date().getFullYear();
+    addExtraRow(`${y + 1}-02`, 50000);
+    addExtraRow(`${y + 2}-02`, 50000);
+  }
+
+  // custom order ที่บันทึกไว้
+  if (saved && Array.isArray(saved.customOrder)) customOrder = saved.customOrder;
+
+  renderLoanSelect(saved && saved.excluded);
+  onStrategyChange(); // แสดง/ซ่อน custom order + sync
+}
+
+// ─── LOAN SELECT (เลือกก้อนที่รวมในแผน) ──────────────────────
+function renderLoanSelect(excludedIds = []) {
+  const excluded = new Set(excludedIds || []);
+  const loans = (DB.getLoans() || []).filter(l => l.status === 'active' && l.currentBalance > 0.005);
+  const el = document.getElementById('loan-select-list');
+  if (loans.length === 0) { el.innerHTML = '<span class="text-muted text-sm">ไม่มีหนี้คงค้าง</span>'; return; }
+  el.innerHTML = loans.map(l => `
+    <label class="chip" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+      <input type="checkbox" class="loan-include" value="${l.id}" ${excluded.has(l.id) ? '' : 'checked'} onchange="onIncludeChange()" />
+      <span style="width:8px;height:8px;border-radius:50%;background:${l.color};display:inline-block"></span>
+      ${l.name}
+    </label>`).join('');
+}
+
+// ─── STRATEGY / CUSTOM ORDER ─────────────────────────────────
+let customOrder = [];  // array ของ loanId ตามลำดับที่ผู้ใช้จัด
+
+function onStrategyChange() {
+  const isCustom = document.getElementById('plan-strategy').value === 'custom';
+  document.getElementById('custom-order-group').style.display = isCustom ? '' : 'none';
+  if (isCustom) syncCustomOrder();
+  savePlanSettings();
+}
+
+function onIncludeChange() {
+  // ถ้าอยู่โหมด custom ให้ sync รายการลำดับตามก้อนที่ติ๊ก
+  if (document.getElementById('plan-strategy').value === 'custom') syncCustomOrder();
+  savePlanSettings();
+}
+
+/** ปรับ customOrder ให้ตรงกับก้อนที่ถูกติ๊ก (คงลำดับเดิม, เพิ่มก้อนใหม่ต่อท้าย, ตัดก้อนที่ถอด) */
+function syncCustomOrder() {
+  const included = [...getIncludedLoanIds()];
+  customOrder = customOrder.filter(id => included.includes(id));
+  included.forEach(id => { if (!customOrder.includes(id)) customOrder.push(id); });
+  renderCustomOrder();
+}
+
+function renderCustomOrder() {
+  const loans = DB.getLoans() || [];
+  const loanMap = Object.fromEntries(loans.map(l => [l.id, l]));
+  const el = document.getElementById('custom-order-list');
+  if (customOrder.length === 0) {
+    el.innerHTML = '<span class="text-muted text-sm">เลือกหนี้ที่รวมในแผนก่อน</span>';
+    return;
+  }
+  el.innerHTML = customOrder.map((id, i) => {
+    const l = loanMap[id];
+    if (!l) return '';
+    return `
+      <div class="flex gap-8 mb-8" style="align-items:center;padding:8px 12px;border:1px solid var(--gray-200);border-radius:8px">
+        <span class="fw-700" style="color:var(--gray-400);width:20px">${i + 1}</span>
+        <span style="width:8px;height:8px;border-radius:50%;background:${l.color}"></span>
+        <span class="fw-600" style="flex:1">${l.name}</span>
+        <span class="text-xs text-muted">฿${Calc.fmt(l.currentBalance, 0)}</span>
+        <button class="btn btn-ghost btn-sm" title="ขึ้น" ${i === 0 ? 'disabled' : ''} onclick="moveCustom(${i}, -1)">▲</button>
+        <button class="btn btn-ghost btn-sm" title="ลง" ${i === customOrder.length - 1 ? 'disabled' : ''} onclick="moveCustom(${i}, 1)">▼</button>
+      </div>`;
+  }).join('');
+}
+
+function moveCustom(idx, dir) {
+  const j = idx + dir;
+  if (j < 0 || j >= customOrder.length) return;
+  [customOrder[idx], customOrder[j]] = [customOrder[j], customOrder[idx]];
+  renderCustomOrder();
+  savePlanSettings();
+}
+
+function getIncludedLoanIds() {
+  const ids = [...document.querySelectorAll('.loan-include:checked')].map(c => c.value);
+  return new Set(ids);
+}
+
+// ─── EXTRA PAYMENT ROWS ──────────────────────────────────────
+function addExtraRow(period = '', amount = '') {
+  const wrap = document.getElementById('extra-list');
+  const row = document.createElement('div');
+  row.className = 'flex gap-8 mb-8 extra-row';
+  row.style.alignItems = 'center';
+  row.innerHTML = `
+    <input class="form-control" type="month" value="${period}" style="width:auto" onchange="savePlanSettings()" />
+    <input class="form-control" type="number" placeholder="จำนวนเงิน" value="${amount}" step="1000" style="flex:1" onchange="savePlanSettings()" />
+    <button class="btn btn-ghost btn-sm" title="ลบ" onclick="this.parentElement.remove(); savePlanSettings()">🗑️</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function readExtras() {
+  const map = {};
+  document.querySelectorAll('.extra-row').forEach(row => {
+    const [pEl, aEl] = row.querySelectorAll('input');
+    const period = pEl.value;
+    const amount = parseFloat(aEl.value) || 0;
+    if (period && amount > 0) map[period] = (map[period] || 0) + amount;
+  });
+  return map;
+}
+
+// ─── CORE: SIMULATE PLAN ─────────────────────────────────────
+function runPlan() {
+  const startYM   = document.getElementById('plan-start').value || DateHelper.currentYM();
+  const budget    = parseFloat(document.getElementById('plan-budget').value) || 0;
+  const strategy  = document.getElementById('plan-strategy').value;
+  const orderList = [...customOrder];  // ลำดับที่ผู้ใช้กำหนด (ใช้เมื่อ strategy = custom)
+  const extras    = readExtras();
+
+  savePlanSettings();  // จำการตั้งค่าล่าสุด
+
+  // เตรียมหนี้ที่ยังต้องชำระ (active + มียอดคงเหลือ + ถูกเลือกให้รวมในแผน)
+  const included = getIncludedLoanIds();
+  const loans = (DB.getLoans() || [])
+    .filter(l => l.status === 'active' && l.currentBalance > 0.005 && included.has(l.id))
+    .map(l => ({
+      id: l.id, name: l.name, color: l.color,
+      balance: l.currentBalance,
+      startBalance: l.currentBalance,
+      rate: l.interestRate || 0,
+      min: l.monthlyPayment || 0
+    }));
+
+  const warnEl = document.getElementById('plan-warning');
+  warnEl.innerHTML = '';
+
+  if (loans.length === 0) {
+    warnEl.innerHTML = included.size === 0
+      ? `<div class="alert alert-warning">⚠️ ยังไม่ได้เลือกหนี้ก้อนใดในแผน — ติ๊กเลือกอย่างน้อย 1 ก้อน</div>`
+      : `<div class="alert alert-info">🎉 ไม่มีหนี้คงค้างแล้ว ไม่ต้องวางแผน</div>`;
+    hideResults();
+    return;
+  }
+
+  const totalMin = loans.reduce((s, l) => s + l.min, 0);
+  if (budget < totalMin) {
+    warnEl.innerHTML = `<div class="alert alert-danger">⚠️ งบต่อเดือน (฿${Calc.fmt(budget,0)}) น้อยกว่าค่างวดขั้นต่ำรวม (฿${Calc.fmt(totalMin,0)}) — เพิ่มงบก่อนจึงจะคำนวณได้</div>`;
+    hideResults();
+    return;
+  }
+
+  // simulate สูงสุด 600 เดือน (50 ปี) กันลูปไม่จบ
+  const MAX_MONTHS = 600;
+  let totalInterest = 0;
+  const payoffMonth = {};
+  const schedule = [];
+
+  let m = 0;
+  for (; m < MAX_MONTHS; m++) {
+    const ym = DateHelper.addMonths(startYM, m);
+
+    // detail รายก้อนของเดือนนี้
+    // minPay = ค่างวดขั้นต่ำ, extraPay = โปะเพิ่มรวม, paid = รวมทั้งหมด, interest = ดอกเดือนนี้
+    // budgetExtra = โปะจากงบเดือน (เขียว), bonusExtra = โปะจากเงินก้อนพิเศษ (น้ำเงิน)
+    const perLoan = {};
+    loans.forEach(l => { perLoan[l.id] = { minPay: 0, extraPay: 0, budgetExtra: 0, bonusExtra: 0, paid: 0, interest: 0, balance: 0, active: l.balance > 0.005 }; });
+
+    // 1) ดอกเบี้ย
+    let monthInterest = 0;
+    loans.forEach(l => {
+      if (l.balance > 0.005) {
+        const monthlyRate = Calc.toMonthlyRate(l.rate);
+        const i = l.balance * (monthlyRate / 100);
+        l.balance += i;
+        monthInterest += i;
+        perLoan[l.id].interest = i;
+      }
+    });
+    totalInterest += monthInterest;
+
+    // 2) งบเดือนนี้ — แยก 2 กอง: budgetPool (งบปกติ) และ bonusPool (เงินก้อนพิเศษ)
+    const extraThisMonth = extras[ym] || 0;
+    let budgetPool = budget;          // เงินจากงบเดือน
+    let bonusPool  = extraThisMonth;  // เงินก้อนโปะพิเศษ
+
+    // 3) จ่ายขั้นต่ำทุกก้อน (ใช้งบเดือนก่อน ถ้าไม่พอค่อยดึงเงินก้อน)
+    let minPaid = 0;
+    loans.forEach(l => {
+      if (l.balance > 0.005) {
+        let need = Math.min(l.min, l.balance);
+        const fromBudget = Math.min(need, budgetPool);
+        budgetPool -= fromBudget; need -= fromBudget;
+        const fromBonus = Math.min(need, bonusPool);
+        bonusPool -= fromBonus; need -= fromBonus;
+        const p = fromBudget + fromBonus;
+        l.balance -= p; minPaid += p;
+        perLoan[l.id].minPay += p;
+        perLoan[l.id].paid   += p;
+      }
+    });
+
+    // 4) เงินเหลือ → ถล่มตามกลยุทธ์
+    //    ใช้ "งบเดือน" ที่เหลือก่อน (นับเป็นโปะสีเขียว) แล้วค่อยใช้ "เงินก้อน" (สีน้ำเงิน)
+    let targetName = '';
+    let guard = 0;
+    while ((budgetPool + bonusPool) > 0.005 && guard < 200) {
+      guard++;
+      const alive = loans.filter(l => l.balance > 0.005);
+      if (!alive.length) break;
+      let target;
+      if (strategy === 'custom') {
+        // เลือกก้อนแรกใน customOrder ที่ยังมียอด
+        const firstId = orderList.find(id => alive.some(l => l.id === id));
+        target = alive.find(l => l.id === firstId) || alive[0];
+      } else if (strategy === 'avalanche') {
+        target = alive.sort((a, b) => (b.rate - a.rate) || (a.balance - b.balance))[0];
+      } else {
+        target = alive.sort((a, b) => (a.balance - b.balance) || (b.rate - a.rate))[0];
+      }
+      if (!targetName) targetName = target.name;
+
+      // จ่ายจากงบเดือนก่อน (เขียว)
+      const fromBudget = Math.min(target.balance, budgetPool);
+      if (fromBudget > 0) {
+        target.balance -= fromBudget; budgetPool -= fromBudget;
+        perLoan[target.id].budgetExtra += fromBudget;
+      }
+      // แล้วจ่ายจากเงินก้อน (น้ำเงิน)
+      const fromBonus = Math.min(target.balance, bonusPool);
+      if (fromBonus > 0) {
+        target.balance -= fromBonus; bonusPool -= fromBonus;
+        perLoan[target.id].bonusExtra += fromBonus;
+      }
+      const p = fromBudget + fromBonus;
+      perLoan[target.id].extraPay += p;
+      perLoan[target.id].paid     += p;
+      if (p <= 0.005) break; // กันลูปค้างกรณีเศษ
+    }
+
+    // 5) บันทึกเดือนที่ปิด + ยอดคงเหลือรายก้อน
+    loans.forEach(l => {
+      perLoan[l.id].balance = Math.max(l.balance, 0);
+      if (l.balance <= 0.005 && !payoffMonth[l.id]) payoffMonth[l.id] = ym;
+    });
+
+    const remaining = loans.reduce((s, l) => s + Math.max(l.balance, 0), 0);
+    schedule.push({
+      ym, budget: budget + extraThisMonth, minPaid, extra: extraThisMonth,
+      target: targetName, remaining, perLoan
+    });
+
+    if (remaining <= 0.005) break;
+  }
+
+  const finished = loans.every(l => l.balance <= 0.005);
+  renderResults({ loans, totalMin, budget, totalInterest, payoffMonth, schedule, finished, months: m + 1, strategy });
+}
+
+// ─── RENDER RESULTS ──────────────────────────────────────────
+let lastResult = null;   // เก็บผลลัพธ์ล่าสุดไว้ให้ renderMatrix ใช้ตอนสลับโหมด
+
+function renderResults(r) {
+  lastResult = r;
+  document.getElementById('plan-stats').style.display    = '';
+  document.getElementById('card-order').style.display    = '';
+  document.getElementById('card-matrix').style.display   = '';
+  document.getElementById('card-schedule').style.display = '';
+
+  const totalStart = r.loans.reduce((s, l) => s + l.startBalance, 0);
+  const lastYM = r.schedule[r.schedule.length - 1].ym;
+
+  document.getElementById('ps-total').textContent    = '฿' + Calc.fmt(totalStart, 0);
+  document.getElementById('ps-count').textContent    = `${r.loans.length} รายการ`;
+  document.getElementById('ps-interest').textContent = '฿' + Calc.fmt(r.totalInterest, 0);
+  document.getElementById('ps-min').textContent      = '฿' + Calc.fmt(r.totalMin, 0);
+  document.getElementById('ps-free').textContent     = `เหลือโปะ ฿${Calc.fmt(r.budget - r.totalMin, 0)}/เดือน`;
+
+  if (r.finished) {
+    document.getElementById('ps-payoff').textContent = DateHelper.toThai(lastYM);
+    document.getElementById('ps-months').textContent = `ภายใน ${r.months} เดือน`;
+  } else {
+    document.getElementById('ps-payoff').textContent = 'ยังไม่ปิด';
+    document.getElementById('ps-months').textContent = `เกิน ${r.months} เดือน`;
+  }
+
+  // ── payoff order ──
+  const order = Object.entries(r.payoffMonth)
+    .sort((a, b) => DateHelper.compare(a[1], b[1]));
+  const loanMap = Object.fromEntries(r.loans.map(l => [l.id, l]));
+  document.getElementById('order-body').innerHTML = order.map(([id, ym], i) => {
+    const l = loanMap[id];
+    return `
+      <tr>
+        <td class="fw-700" style="color:var(--gray-400)">${i + 1}</td>
+        <td>
+          <div class="flex gap-8" style="align-items:center">
+            <div style="width:8px;height:8px;border-radius:50%;background:${l.color}"></div>
+            <span class="fw-600">${l.name}</span>
+          </div>
+        </td>
+        <td class="num">฿${Calc.fmt(l.startBalance)}</td>
+        <td class="num red-text">${l.rate > 0 ? l.rate.toFixed(2) + '%' : '—'}</td>
+        <td class="fw-600" style="color:var(--success)">${DateHelper.toThai(ym)}</td>
+      </tr>`;
+  }).join('');
+
+  // ── monthly schedule ──
+  const body = r.schedule.map(s => {
+    const isExtra = s.extra > 0;
+    return `
+      <tr style="${isExtra ? 'background:var(--warning-light)' : ''}">
+        <td class="fw-600">${DateHelper.toThai(s.ym)}${isExtra ? ' ⭐' : ''}</td>
+        <td class="num fw-600">฿${Calc.fmt(s.budget, 0)}</td>
+        <td class="num">฿${Calc.fmt(s.minPaid, 0)}</td>
+        <td class="num ${isExtra ? 'red-text fw-600' : 'text-muted'}">${s.extra > 0 ? '฿' + Calc.fmt(s.extra, 0) : '—'}</td>
+        <td>${s.target || '—'}</td>
+        <td class="num">฿${Calc.fmt(s.remaining, 0)}</td>
+      </tr>`;
+  }).join('');
+  document.getElementById('schedule-body').innerHTML = body;
+  document.getElementById('schedule-chip').textContent = `${r.schedule.length} เดือน`;
+
+  const stratLabel = { avalanche: 'Avalanche', snowball: 'Snowball', custom: 'กำหนดลำดับเอง' }[r.strategy] || r.strategy;
+  document.getElementById('plan-subtitle').textContent =
+    `กลยุทธ์ ${stratLabel} · เริ่ม ${DateHelper.toThai(r.schedule[0].ym)}`;
+
+  if (!r.finished) {
+    document.getElementById('plan-warning').innerHTML =
+      `<div class="alert alert-warning">⚠️ ด้วยงบปัจจุบัน ยังปิดหนี้ไม่ครบภายใน ${r.months} เดือน ลองเพิ่มงบ/เดือน หรือเพิ่มเงินโปะพิเศษ</div>`;
+  }
+
+  renderMatrix();
+}
+
+// ─── PER-LOAN MATRIX ─────────────────────────────────────────
+function renderMatrix() {
+  const r = lastResult;
+  if (!r) return;
+  const mode = document.getElementById('matrix-mode').value; // balance | paid | interest
+  document.getElementById('matrix-legend').style.display = (mode === 'paid') ? '' : 'none';
+
+  // หัวตาราง: เดือน + ทุกก้อน (เรียงตามลำดับที่ปิดก่อน เพื่อให้อ่านง่าย)
+  const order = Object.entries(r.payoffMonth).sort((a, b) => DateHelper.compare(a[1], b[1])).map(e => e[0]);
+  const orderedIds = [...order, ...r.loans.map(l => l.id).filter(id => !order.includes(id))];
+  const loanMap = Object.fromEntries(r.loans.map(l => [l.id, l]));
+
+  document.getElementById('matrix-head').innerHTML = `
+    <tr>
+      <th style="position:sticky;left:0;background:var(--gray-50);z-index:2">เดือน</th>
+      ${orderedIds.map(id => {
+        const l = loanMap[id];
+        return `<th class="text-right" style="white-space:nowrap">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${l.color};margin-right:4px"></span>${l.name}
+        </th>`;
+      }).join('')}
+      <th class="text-right" style="background:var(--gray-50)">รวม</th>
+    </tr>`;
+
+  document.getElementById('matrix-body').innerHTML = r.schedule.map(s => {
+    const isExtra = s.extra > 0;
+    let rowTotal = 0;
+    const cells = orderedIds.map(id => {
+      const d = s.perLoan[id] || { paid: 0, interest: 0, balance: 0, active: false };
+      let val, cls = 'num', txt;
+
+      if (mode === 'balance') {
+        val = d.balance;
+        if (val <= 0.005) { txt = '<span style="color:var(--success)">✓ ปิด</span>'; cls = ''; }
+        else txt = '฿' + Calc.fmt(val, 0);
+        rowTotal += Math.max(val, 0);
+      } else if (mode === 'paid') {
+        val = d.paid;
+        rowTotal += val;
+        if (val <= 0.005) {
+          txt = '<span style="color:var(--gray-300)">—</span>';
+        } else {
+          // ค่างวดปกติ + โปะจากงบเดือน (เขียว) + โปะพิเศษ (เหลือง)
+          let parts = `฿${Calc.fmt(d.minPay, 0)}`;
+          if (d.budgetExtra > 0.005) parts += ` <span style="color:var(--success);font-weight:700">+${Calc.fmt(d.budgetExtra, 0)}</span>`;
+          if (d.bonusExtra > 0.005)  parts += ` <span style="color:#e6a700;font-weight:700">+${Calc.fmt(d.bonusExtra, 0)}</span>`;
+          txt = parts;
+        }
+      } else { // interest
+        val = d.interest;
+        rowTotal += val;
+        txt = val > 0.005 ? '฿' + Calc.fmt(val, 0) : '<span style="color:var(--gray-300)">—</span>';
+        if (val > 0.005) cls = 'num red-text';
+      }
+      return `<td class="${cls}">${txt}</td>`;
+    }).join('');
+
+    return `
+      <tr style="${isExtra ? 'background:var(--warning-light)' : ''}">
+        <td class="fw-600" style="position:sticky;left:0;background:${isExtra ? 'var(--warning-light)' : 'var(--white, #fff)'};z-index:1;white-space:nowrap">
+          ${DateHelper.toThai(s.ym)}${isExtra ? ' ⭐' : ''}
+        </td>
+        ${cells}
+        <td class="num fw-700" style="background:var(--gray-50)">฿${Calc.fmt(rowTotal, 0)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function hideResults() {
+  document.getElementById('plan-stats').style.display    = 'none';
+  document.getElementById('card-order').style.display    = 'none';
+  document.getElementById('card-matrix').style.display   = 'none';
+  document.getElementById('card-schedule').style.display = 'none';
+}
+</script>
+</body>
+</html>

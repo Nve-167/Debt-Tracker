@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debt Tracker — รายการ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="emoji">💳</span>
+    Debt Tracker
+  </div>
+  <ul class="navbar-nav">
+    <li><a href="index.html">📊 <span class="label">Dashboard</span></a></li>
+    <li><a href="loans.html" class="active">🗂️ <span class="label">รายการ</span></a></li>
+    <li><a href="payment.html">✏️ <span class="label">บันทึกชำระ</span></a></li>
+    <li><a href="plan.html">🎯 <span class="label">วางแผนปิดหนี้</span></a></li>
+  </ul>
+</nav>
+
+<div class="container">
+
+  <!-- ── PAGE HEADER ── -->
+  <div class="page-header flex-between">
+    <div>
+      <div class="page-title">🗂️ จัดการรายการ</div>
+      <div class="page-subtitle" id="loans-subtitle">กำลังโหลด...</div>
+    </div>
+    <button class="btn btn-primary" onclick="openModal('modal-add-loan')">+ เพิ่มรายการ</button>
+  </div>
+
+  <!-- ── SUMMARY BAR ── -->
+  <div class="stats-grid" id="loans-stats" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat-card red">
+      <div class="stat-label">ยอดรวม (active)</div>
+      <div class="stat-value red" id="ls-total">-</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">ค่างวดรวม/เดือน</div>
+      <div class="stat-value orange" id="ls-payment">-</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">จำนวนรายการ</div>
+      <div class="stat-value" id="ls-count">-</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">ปิดแล้ว</div>
+      <div class="stat-value green" id="ls-paid">-</div>
+    </div>
+  </div>
+
+  <!-- ── TABS ── -->
+  <div class="tabs" id="loan-tabs">
+    <button class="tab-btn active" data-tab="tab-cards">🃏 การ์ด</button>
+    <button class="tab-btn" data-tab="tab-table">📋 ตาราง</button>
+    <button class="tab-btn" data-tab="tab-history">📜 ประวัติชำระ</button>
+  </div>
+
+  <!-- ── TAB: CARDS ── -->
+  <div class="tab-content active" id="tab-cards">
+    <div class="loans-grid" id="loans-card-grid">
+      <div class="empty-state"><div class="emoji">⏳</div><p>กำลังโหลด...</p></div>
+    </div>
+  </div>
+
+  <!-- ── TAB: TABLE ── -->
+  <div class="tab-content" id="tab-table">
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>ชื่อรายการ</th>
+                <th class="text-right">ต้นทุนเริ่มต้น</th>
+                <th class="text-right">คงเหลือ</th>
+                <th class="text-right">ค่างวด/เดือน</th>
+                <th class="text-right">ดอกเบี้ย%/ปี</th>
+                <th class="text-right">ดอกเบี้ยเดือนนี้</th>
+                <th class="text-right">คืบหน้า</th>
+                <th>สถานะ</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="loans-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: HISTORY ── -->
+  <div class="tab-content" id="tab-history">
+    <div class="card">
+      <div class="card-header flex-between">
+        <div class="card-title">📜 ประวัติการชำระทั้งหมด</div>
+        <div class="flex gap-8">
+          <select class="form-control" style="width:auto;font-size:13px;padding:5px 10px" id="history-loan-filter" onchange="renderHistory()">
+            <option value="all">ทุกรายการ</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="exportHistory()">📥 Export CSV</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>เดือน</th>
+                <th>รายการ</th>
+                <th class="text-right">ค่างวด</th>
+                <th class="text-right">ดอกเบี้ย</th>
+                <th class="text-right">เงินต้น</th>
+                <th class="text-right">คงเหลือหลังชำระ</th>
+                <th>หมายเหตุ</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: ADD / EDIT LOAN
+══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-add-loan">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-loan-title">➕ เพิ่มรายการ</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-loan')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-loan-id" />
+      <div class="form-group">
+        <label>ชื่อรายการ *</label>
+        <input class="form-control" id="loan-name" placeholder="เช่น KT1800, CI1800" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ยอดเริ่มต้น (บาท) *</label>
+          <input class="form-control" id="loan-original" type="number" min="0" step="0.01" placeholder="0.00" data-numeric />
+        </div>
+        <div class="form-group">
+          <label>ยอดคงเหลือปัจจุบัน (บาท) *</label>
+          <input class="form-control" id="loan-balance" type="number" min="0" step="0.01" placeholder="0.00" data-numeric />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ค่างวด/เดือน (บาท)</label>
+          <input class="form-control" id="loan-payment" type="number" min="0" step="0.01" placeholder="0.00" data-numeric />
+        </div>
+        <div class="form-group">
+          <label>ดอกเบี้ย (% ต่อปี)</label>
+          <input class="form-control" id="loan-rate" type="number" min="0" step="0.01" placeholder="20" data-numeric />
+          <div class="form-hint">เช่น 20% ต่อปี, 7% ต่อปี</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>เดือนที่เริ่ม (YYYY-MM)</label>
+          <input class="form-control" id="loan-start" type="month" />
+        </div>
+        <div class="form-group">
+          <label>สี</label>
+          <input class="form-control" id="loan-color" type="color" value="#2563eb" style="height:42px;padding:4px 8px;cursor:pointer" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>สถานะ</label>
+        <select class="form-control" id="loan-status">
+          <option value="active">🔵 กำลังชำระ</option>
+          <option value="paid">✅ ปิดแล้ว</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>หมายเหตุ</label>
+        <input class="form-control" id="loan-notes" placeholder="(ไม่บังคับ)" />
+      </div>
+
+      <!-- ── Preview interest ── -->
+      <div class="alert alert-info" id="loan-interest-preview" style="display:none">
+        <span>📊</span>
+        <span id="loan-interest-preview-text"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add-loan')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveLoan()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: CONFIRM DELETE LOAN
+══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-delete-loan">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🗑️ ลบรายการ</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-delete-loan')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-danger">
+        คุณต้องการลบ "<strong id="delete-loan-name"></strong>" ใช่ไหม?<br/>
+        ประวัติการชำระของรายการนี้จะถูกลบด้วย
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-delete-loan')">ยกเลิก</button>
+      <button class="btn btn-danger" id="btn-confirm-delete" onclick="confirmDeleteLoan()">ลบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: MARK AS PAID
+══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-mark-paid">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✅ ปิดรายการนี้</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-mark-paid')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-success">
+        ต้องการทำเครื่องหมายว่า "<strong id="paid-loan-name"></strong>" ปิดแล้วใช่ไหม?
+      </div>
+      <div class="form-group">
+        <label>ยอดคงเหลือสุดท้าย (บาท)</label>
+        <input class="form-control" id="paid-final-balance" type="number" min="0" step="0.01" value="0" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-mark-paid')">ยกเลิก</button>
+      <button class="btn btn-success" id="btn-confirm-paid" onclick="confirmMarkPaid()">✅ ยืนยันปิด</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="app.js"></script>
+<script>
+// ─── STATE ───────────────────────────────────────────────────
+let deleteLoanId = null;
+let markPaidLoanId = null;
+
+// ─── PAGE INIT ───────────────────────────────────────────────
+function pageInit() {
+  initTabs('#loan-tabs');
+  populateHistoryFilter();
+  renderLoansPage();
+
+  // live interest preview
+  ['loan-balance', 'loan-rate', 'loan-payment'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateInterestPreview);
+  });
+}
+
+// ─── RENDER ALL ──────────────────────────────────────────────
+function renderLoansPage() {
+  const loans    = DB.getLoans() || [];
+  const active   = loans.filter(l => l.status === 'active');
+  const paid     = loans.filter(l => l.status === 'paid');
+
+  document.getElementById('loans-subtitle').textContent =
+    `${active.length} รายการกำลังชำระ · ${paid.length} ปิดแล้ว`;
+  document.getElementById('ls-total').textContent    = '฿' + Calc.fmt(Calc.sum(active, 'currentBalance'));
+  document.getElementById('ls-payment').textContent  = '฿' + Calc.fmt(Calc.sum(active, 'monthlyPayment'), 0);
+  document.getElementById('ls-count').textContent    = active.length + ' รายการ';
+  document.getElementById('ls-paid').textContent     = paid.length + ' รายการ';
+
+  renderCards();
+  renderTable();
+  renderHistory();
+}
+
+// ─── CARDS ───────────────────────────────────────────────────
+function renderCards() {
+  const loans = DB.getLoans() || [];
+  const grid  = document.getElementById('loans-card-grid');
+  if (loans.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="emoji">💡</div><p>ยังไม่มีรายการ กด "+ เพิ่มรายการ" เพื่อเริ่มต้น</p></div>`;
+    return;
+  }
+
+  const sorted = [...loans].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+    return b.currentBalance - a.currentBalance;
+  });
+
+  grid.innerHTML = sorted.map(loan => {
+    const pct      = Calc.progressPct(loan.originalAmount, loan.currentBalance);
+    const intNow   = Calc.monthlyInterest(loan.currentBalance, loan.interestRate);
+    const months   = Calc.monthsToPayoff(loan.currentBalance, loan.monthlyPayment, loan.interestRate);
+    const isPaid   = loan.status === 'paid';
+    const barColor = isPaid ? 'green' : pct > 66 ? 'green' : pct > 33 ? 'blue' : 'orange';
+    const cardClass = isPaid ? 'loan-card paid' : 'loan-card';
+    const badge = isPaid
+      ? `<span class="badge badge-paid">✅ ปิดแล้ว</span>`
+      : `<span class="badge badge-active">🔵 ชำระอยู่</span>`;
+
+    return `
+    <div class="${cardClass}" style="border-left-color:${loan.color}">
+      <div class="loan-name">
+        <div class="flex gap-8" style="align-items:center">
+          <div style="width:12px;height:12px;border-radius:50%;background:${loan.color}"></div>
+          ${loan.name}
+        </div>
+        ${badge}
+      </div>
+
+      <div class="loan-meta">
+        <div class="loan-meta-item">
+          <div class="label">ยอดต้นทุน</div>
+          <div class="value">฿${Calc.fmt(loan.originalAmount)}</div>
+        </div>
+        <div class="loan-meta-item">
+          <div class="label">คงเหลือ</div>
+          <div class="value" style="color:var(--danger)">฿${Calc.fmt(loan.currentBalance)}</div>
+        </div>
+        <div class="loan-meta-item">
+          <div class="label">ค่างวด/เดือน</div>
+          <div class="value">฿${Calc.fmt(loan.monthlyPayment, 0)}</div>
+        </div>
+        <div class="loan-meta-item">
+          <div class="label">ดอกเบี้ย/เดือน</div>
+          <div class="value" style="color:var(--danger)">฿${Calc.fmt(intNow)}</div>
+        </div>
+        ${months ? `
+        <div class="loan-meta-item">
+          <div class="label">คาดปิดใน</div>
+          <div class="value">${months} เดือน</div>
+        </div>
+        <div class="loan-meta-item">
+          <div class="label">เดือนที่เริ่ม</div>
+          <div class="value">${DateHelper.toThai(loan.startDate)}</div>
+        </div>` : ''}
+      </div>
+
+      <div class="loan-progress-label">
+        <span>ชำระแล้ว ${pct.toFixed(1)}%</span>
+        <span>฿${Calc.fmt(loan.originalAmount - loan.currentBalance)} จาก ฿${Calc.fmt(loan.originalAmount)}</span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar ${barColor}" style="width:${pct}%"></div>
+      </div>
+
+      ${loan.notes ? `<div class="text-xs text-muted mt-8">📝 ${loan.notes}</div>` : ''}
+
+      <div class="loan-actions">
+        <button class="btn btn-outline btn-sm" onclick="openEditLoan('${loan.id}')">✏️ แก้ไข</button>
+        ${!isPaid ? `<button class="btn btn-success btn-sm" onclick="openMarkPaid('${loan.id}')">✅ ปิดยอด</button>` : ''}
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto;color:var(--danger)" onclick="openDeleteLoan('${loan.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TABLE ───────────────────────────────────────────────────
+function renderTable() {
+  const loans = DB.getLoans() || [];
+  const tbody = document.getElementById('loans-table-body');
+
+  if (loans.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--gray-400)">ไม่มีรายการ</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = loans.map((loan, i) => {
+    const pct    = Calc.progressPct(loan.originalAmount, loan.currentBalance);
+    const intNow = Calc.monthlyInterest(loan.currentBalance, loan.interestRate);
+    const isPaid = loan.status === 'paid';
+    return `
+    <tr>
+      <td>${i + 1}</td>
+      <td>
+        <div class="flex gap-8" style="align-items:center">
+          <div style="width:8px;height:8px;border-radius:50%;background:${loan.color}"></div>
+          <span class="fw-600">${loan.name}</span>
+        </div>
+      </td>
+      <td class="num">฿${Calc.fmt(loan.originalAmount)}</td>
+      <td class="num ${isPaid ? 'green-text' : 'red-text'}">฿${Calc.fmt(loan.currentBalance)}</td>
+      <td class="num">฿${Calc.fmt(loan.monthlyPayment, 0)}</td>
+      <td class="num">${loan.interestRate > 0 ? loan.interestRate.toFixed(2) + '%' : '—'}</td>
+      <td class="num red-text">฿${Calc.fmt(intNow)}</td>
+      <td style="min-width:120px">
+        <div class="progress-wrap" style="margin-bottom:3px">
+          <div class="progress-bar ${isPaid ? 'green' : 'blue'}" style="width:${pct}%"></div>
+        </div>
+        <span class="text-xs text-muted">${pct.toFixed(1)}%</span>
+      </td>
+      <td>${isPaid ? `<span class="badge badge-paid">✅ ปิดแล้ว</span>` : `<span class="badge badge-active">🔵 ชำระอยู่</span>`}</td>
+      <td>
+        <div class="flex gap-8">
+          <button class="btn btn-ghost btn-sm" onclick="openEditLoan('${loan.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="openDeleteLoan('${loan.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── HISTORY ─────────────────────────────────────────────────
+function populateHistoryFilter() {
+  const loans  = DB.getLoans() || [];
+  const sel    = document.getElementById('history-loan-filter');
+  const current = sel.value;
+  sel.innerHTML = `<option value="all">ทุกรายการ</option>` +
+    loans.map(l => `<option value="${l.id}" ${current === l.id ? 'selected' : ''}>${l.name}</option>`).join('');
+}
+
+function renderHistory() {
+  const payments = DB.getPayments() || [];
+  const loans    = DB.getLoans() || [];
+  const loanMap  = Object.fromEntries(loans.map(l => [l.id, l]));
+  const filter   = document.getElementById('history-loan-filter').value;
+  const tbody    = document.getElementById('history-table-body');
+
+  const filtered = filter === 'all' ? payments : payments.filter(p => p.loanId === filter);
+  const sorted   = [...filtered].sort((a, b) => {
+    const dc = DateHelper.compare(b.period, a.period);
+    return dc !== 0 ? dc : new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--gray-400)">ไม่มีประวัติการชำระ</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = sorted.map(p => {
+    const loan = loanMap[p.loanId];
+    const principal = Number(p.principal);
+    return `
+    <tr>
+      <td>${DateHelper.toThai(p.period)}</td>
+      <td>
+        <div class="flex gap-8" style="align-items:center">
+          ${loan ? `<div style="width:8px;height:8px;border-radius:50%;background:${loan.color}"></div>` : ''}
+          <span class="fw-600">${loan ? loan.name : p.loanId}</span>
+        </div>
+      </td>
+      <td class="num">฿${Calc.fmt(p.amount)}</td>
+      <td class="num red-text">฿${Calc.fmt(p.interest)}</td>
+      <td class="num ${principal >= 0 ? 'green-text' : 'red-text'}">฿${Calc.fmt(p.principal)}</td>
+      <td class="num">฿${Calc.fmt(p.balanceAfter)}</td>
+      <td class="text-xs text-muted">${p.notes || '—'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deletePayment('${p.id}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function exportHistory() {
+  const payments = DB.getPayments() || [];
+  const loans    = DB.getLoans() || [];
+  const loanMap  = Object.fromEntries(loans.map(l => [l.id, l]));
+  const filter   = document.getElementById('history-loan-filter').value;
+  const filtered = filter === 'all' ? payments : payments.filter(p => p.loanId === filter);
+  const sorted   = [...filtered].sort((a, b) => DateHelper.compare(a.period, b.period));
+
+  const header = 'เดือน,รายการ,ค่างวด,ดอกเบี้ย,เงินต้น,คงเหลือ,หมายเหตุ';
+  const rows   = sorted.map(p => [
+    DateHelper.toThai(p.period),
+    loanMap[p.loanId]?.name || p.loanId,
+    p.amount, p.interest, p.principal, p.balanceAfter,
+    (p.notes || '').replace(/,/g, ';')
+  ].join(','));
+
+  const bom  = '\uFEFF'; // UTF-8 BOM for Excel
+  const blob = new Blob([bom + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `debt-history-${DateHelper.currentYM()}.csv`;
+  a.click();
+  toast('Export CSV สำเร็จ', 'success');
+}
+
+// ─── ADD / EDIT LOAN ─────────────────────────────────────────
+function openAddLoan() {
+  document.getElementById('modal-loan-title').textContent = '➕ เพิ่มรายการ';
+  document.getElementById('edit-loan-id').value = '';
+  document.getElementById('loan-name').value    = '';
+  document.getElementById('loan-original').value = '';
+  document.getElementById('loan-balance').value  = '';
+  document.getElementById('loan-payment').value  = '';
+  document.getElementById('loan-rate').value     = '';
+  document.getElementById('loan-start').value    = DateHelper.currentYM();
+  document.getElementById('loan-color').value    = '#2563eb';
+  document.getElementById('loan-status').value   = 'active';
+  document.getElementById('loan-notes').value    = '';
+  document.getElementById('loan-interest-preview').style.display = 'none';
+  openModal('modal-add-loan');
+}
+
+function openEditLoan(id) {
+  const loan = (DB.getLoans() || []).find(l => l.id === id);
+  if (!loan) return;
+  document.getElementById('modal-loan-title').textContent = '✏️ แก้ไขรายการ';
+  document.getElementById('edit-loan-id').value  = loan.id;
+  document.getElementById('loan-name').value     = loan.name;
+  document.getElementById('loan-original').value = loan.originalAmount;
+  document.getElementById('loan-balance').value  = loan.currentBalance;
+  document.getElementById('loan-payment').value  = loan.monthlyPayment;
+  document.getElementById('loan-rate').value     = loan.interestRate;
+  document.getElementById('loan-start').value    = loan.startDate || '';
+  document.getElementById('loan-color').value    = loan.color || '#2563eb';
+  document.getElementById('loan-status').value   = loan.status;
+  document.getElementById('loan-notes').value    = loan.notes || '';
+  updateInterestPreview();
+  openModal('modal-add-loan');
+}
+
+function updateInterestPreview() {
+  const balance = parseFloat(document.getElementById('loan-balance').value) || 0;
+  const rate    = parseFloat(document.getElementById('loan-rate').value)    || 0;
+  const payment = parseFloat(document.getElementById('loan-payment').value) || 0;
+  const preview = document.getElementById('loan-interest-preview');
+
+  if (balance > 0 && rate > 0) {
+    const int  = Calc.monthlyInterest(balance, rate);
+    const prin = payment - int;
+    const months = Calc.monthsToPayoff(balance, payment, rate);
+    document.getElementById('loan-interest-preview-text').innerHTML =
+      `ดอกเบี้ยเดือนนี้ <strong>฿${Calc.fmt(int)}</strong> &nbsp;·&nbsp; เงินต้น <strong style="color:${prin >= 0 ? 'var(--success)' : 'var(--danger)'}">฿${Calc.fmt(prin)}</strong>` +
+      (months ? ` &nbsp;·&nbsp; คาดปิดใน <strong>${months} เดือน</strong>` : '');
+    preview.style.display = 'flex';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function saveLoan() {
+  const name     = document.getElementById('loan-name').value.trim();
+  const original = parseFloat(document.getElementById('loan-original').value) || 0;
+  const balance  = parseFloat(document.getElementById('loan-balance').value)  || 0;
+  const payment  = parseFloat(document.getElementById('loan-payment').value)  || 0;
+  const rate     = parseFloat(document.getElementById('loan-rate').value)     || 0;
+  const start    = document.getElementById('loan-start').value;
+  const color    = document.getElementById('loan-color').value;
+  const status   = document.getElementById('loan-status').value;
+  const notes    = document.getElementById('loan-notes').value.trim();
+  const editId   = document.getElementById('edit-loan-id').value;
+
+  if (!name) { toast('กรุณากรอกชื่อรายการ', 'error'); return; }
+  if (original < 0 || balance < 0) { toast('ยอดต้องมากกว่า 0', 'error'); return; }
+
+  const loans = DB.getLoans() || [];
+
+  if (editId) {
+    const idx = loans.findIndex(l => l.id === editId);
+    if (idx === -1) { toast('ไม่พบรายการ', 'error'); return; }
+    loans[idx] = { ...loans[idx], name, originalAmount: original, currentBalance: balance,
+      monthlyPayment: payment, interestRate: rate, startDate: start,
+      color, status, notes, updatedAt: new Date().toISOString() };
+    toast(`แก้ไข "${name}" เรียบร้อย`, 'success');
+  } else {
+    loans.push({
+      id: genId('loan'), name, originalAmount: original, currentBalance: balance,
+      monthlyPayment: payment, interestRate: rate, startDate: start,
+      color, status, notes, createdAt: new Date().toISOString()
+    });
+    toast(`เพิ่ม "${name}" เรียบร้อย`, 'success');
+  }
+
+  DB.saveLoans(loans);
+  closeModal('modal-add-loan');
+  populateHistoryFilter();
+  renderLoansPage();
+}
+
+// ─── DELETE LOAN ─────────────────────────────────────────────
+function openDeleteLoan(id) {
+  const loan = (DB.getLoans() || []).find(l => l.id === id);
+  if (!loan) return;
+  deleteLoanId = id;
+  document.getElementById('delete-loan-name').textContent = loan.name;
+  openModal('modal-delete-loan');
+}
+
+function confirmDeleteLoan() {
+  if (!deleteLoanId) return;
+  const loans    = (DB.getLoans() || []).filter(l => l.id !== deleteLoanId);
+  const payments = (DB.getPayments() || []).filter(p => p.loanId !== deleteLoanId);
+  DB.saveLoans(loans);
+  DB.savePayments(payments);
+  deleteLoanId = null;
+  closeModal('modal-delete-loan');
+  toast('ลบรายการเรียบร้อย', 'warning');
+  populateHistoryFilter();
+  renderLoansPage();
+}
+
+// ─── MARK PAID ───────────────────────────────────────────────
+function openMarkPaid(id) {
+  const loan = (DB.getLoans() || []).find(l => l.id === id);
+  if (!loan) return;
+  markPaidLoanId = id;
+  document.getElementById('paid-loan-name').textContent = loan.name;
+  document.getElementById('paid-final-balance').value   = loan.currentBalance;
+  openModal('modal-mark-paid');
+}
+
+function confirmMarkPaid() {
+  if (!markPaidLoanId) return;
+  const loans = DB.getLoans() || [];
+  const idx   = loans.findIndex(l => l.id === markPaidLoanId);
+  if (idx === -1) return;
+  const finalBalance = parseFloat(document.getElementById('paid-final-balance').value) || 0;
+  loans[idx].status         = 'paid';
+  loans[idx].currentBalance = finalBalance;
+  loans[idx].paidAt         = new Date().toISOString();
+  DB.saveLoans(loans);
+  markPaidLoanId = null;
+  closeModal('modal-mark-paid');
+  toast(`🎉 ปิดยอด "${loans[idx].name}" เรียบร้อย!`, 'success');
+  renderLoansPage();
+}
+
+// ─── DELETE SINGLE PAYMENT ────────────────────────────────────
+function deletePayment(paymentId) {
+  const payments = (DB.getPayments() || []).filter(p => p.id !== paymentId);
+  DB.savePayments(payments);
+  toast('ลบรายการชำระเรียบร้อย', 'warning');
+  renderHistory();
+}
+</script>
+</body>
+</html>

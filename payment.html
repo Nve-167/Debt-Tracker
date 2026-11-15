@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debt Tracker — บันทึกการชำระ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="emoji">💳</span>
+    Debt Tracker
+  </div>
+  <ul class="navbar-nav">
+    <li><a href="index.html">📊 <span class="label">Dashboard</span></a></li>
+    <li><a href="loans.html">🗂️ <span class="label">รายการ</span></a></li>
+    <li><a href="payment.html" class="active">✏️ <span class="label">บันทึกชำระ</span></a></li>
+    <li><a href="plan.html">🎯 <span class="label">วางแผนปิดหนี้</span></a></li>
+  </ul>
+</nav>
+
+<div class="container">
+
+  <!-- ── PAGE HEADER ── -->
+  <div class="page-header flex-between">
+    <div>
+      <div class="page-title">✏️ บันทึกการชำระ</div>
+      <div class="page-subtitle" id="payment-subtitle">กำลังโหลด...</div>
+    </div>
+    <button class="btn btn-success" onclick="openBulkModal()">⚡ บันทึกทีเดียวทุกรายการ</button>
+  </div>
+
+  <!-- ── PERIOD SELECTOR ── -->
+  <div class="card mb-16">
+    <div class="card-body" style="padding:14px 20px">
+      <div class="flex gap-16" style="align-items:center;flex-wrap:wrap">
+        <div style="flex:0 0 auto">
+          <label style="margin-bottom:4px">เดือนที่ชำระ</label>
+          <input class="form-control" type="month" id="selected-period" style="width:auto" onchange="onPeriodChange()" />
+        </div>
+        <div id="period-summary" style="flex:1;min-width:200px"></div>
+        <div class="flex gap-8">
+          <button class="btn btn-outline btn-sm" onclick="prevMonth()">◀ เดือนก่อน</button>
+          <button class="btn btn-outline btn-sm" onclick="nextMonth()">เดือนถัดไป ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TABS ── -->
+  <div class="tabs" id="pay-tabs">
+    <button class="tab-btn active" data-tab="tab-quick">⚡ บันทึกด่วน</button>
+    <button class="tab-btn" data-tab="tab-manual">📝 กรอกเองละเอียด</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       TAB: QUICK ENTRY (checklist style)
+  ══════════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-quick">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">⚡ รายการที่ต้องชำระ</div>
+        <div class="flex gap-8">
+          <span class="chip" id="quick-done-chip">0/0 ชำระแล้ว</span>
+          <button class="btn btn-ghost btn-sm" onclick="autoFillAll()">🤖 Auto Fill ทั้งหมด</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0" id="quick-list">
+        <div class="empty-state"><div class="emoji">⏳</div><p>กำลังโหลด...</p></div>
+      </div>
+      <div style="padding:16px 20px;border-top:1px solid var(--gray-100)">
+        <div class="alert alert-info mb-16" id="quick-total-alert" style="display:none"></div>
+        <div class="flex-between" style="flex-wrap:wrap;gap:10px">
+          <div id="quick-summary-text" class="text-sm text-muted"></div>
+          <button class="btn btn-primary btn-lg" onclick="saveAllQuick()" id="btn-save-quick">
+            💾 บันทึกรายการที่ติ๊กเลือก
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       TAB: MANUAL ENTRY (single payment form)
+  ══════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-manual">
+    <div style="display:grid;grid-template-columns:1fr 400px;gap:16px;align-items:start">
+
+      <!-- Form -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📝 กรอกรายการชำระ</div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>รายการ *</label>
+            <select class="form-control" id="man-loan" onchange="onManLoanChange()">
+              <option value="">— เลือกรายการ —</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ยอดคงเหลือก่อนชำระ (บาท)</label>
+              <input class="form-control" id="man-balance-before" type="number" step="0.01"
+                placeholder="ดึงจากระบบอัตโนมัติ" oninput="calcManual()" />
+            </div>
+            <div class="form-group">
+              <label>ค่างวดที่จ่าย (บาท) *</label>
+              <input class="form-control" id="man-amount" type="number" step="0.01"
+                placeholder="0.00" oninput="calcManual()" />
+            </div>
+          </div>
+
+          <!-- Auto-calc result -->
+          <div class="card mb-16" style="background:var(--gray-50);box-shadow:none;border:1px solid var(--gray-200)" id="man-calc-card">
+            <div class="card-body" style="padding:14px 16px">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px" id="man-calc-display">
+                <div>
+                  <div class="text-xs text-muted">ดอกเบี้ย</div>
+                  <div class="fw-700" style="color:var(--danger)" id="man-disp-int">—</div>
+                </div>
+                <div>
+                  <div class="text-xs text-muted">เงินต้นที่ลด</div>
+                  <div class="fw-700" id="man-disp-prin">—</div>
+                </div>
+                <div>
+                  <div class="text-xs text-muted">คงเหลือหลังชำระ</div>
+                  <div class="fw-700" style="color:var(--success)" id="man-disp-after">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ดอกเบี้ย (บาท) — แก้ไขได้</label>
+              <input class="form-control" id="man-interest" type="number" step="0.01"
+                placeholder="คำนวณอัตโนมัติ" oninput="onManInterestChange()" />
+              <div class="form-hint">ปรับถ้าต่างจากที่คำนวณ</div>
+            </div>
+            <div class="form-group">
+              <label>คงเหลือหลังชำระ (บาท)</label>
+              <input class="form-control" id="man-balance-after" type="number" step="0.01"
+                placeholder="คำนวณอัตโนมัติ" oninput="onManBalanceAfterChange()" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>หมายเหตุ</label>
+            <input class="form-control" id="man-notes" placeholder="(ไม่บังคับ)" />
+          </div>
+
+          <button class="btn btn-primary w-full btn-lg" onclick="saveManual()">💾 บันทึกการชำระ</button>
+        </div>
+      </div>
+
+      <!-- Sidebar: recent for selected loan -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title" id="sidebar-loan-name">📊 ข้อมูลรายการ</div>
+          </div>
+          <div class="card-body" id="sidebar-loan-detail">
+            <div class="empty-state" style="padding:24px">
+              <div class="emoji">☝️</div>
+              <p>เลือกรายการ</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-12">
+          <div class="card-header">
+            <div class="card-title">🕐 ชำระล่าสุด (รายการนี้)</div>
+          </div>
+          <div class="card-body" style="padding:0;max-height:320px;overflow-y:auto" id="sidebar-recent">
+            <div style="padding:20px;text-align:center;color:var(--gray-400)">เลือกรายการ</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL: BULK ENTRY
+══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-bulk">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <div class="modal-title">⚡ บันทึกทีเดียวทุกรายการ</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-bulk')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info mb-16">
+        ระบบจะคำนวณดอกเบี้ยและเงินต้นให้อัตโนมัติจากยอดคงเหลือและอัตราดอกเบี้ย
+      </div>
+      <div id="bulk-period-label" class="fw-600 mb-16"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>รายการ</th>
+              <th class="text-right">คงเหลือ</th>
+              <th class="text-right">ดอกเบี้ย</th>
+              <th class="text-right">ค่างวด</th>
+              <th class="text-right">เงินต้น</th>
+              <th class="text-right">คงเหลือหลัง</th>
+            </tr>
+          </thead>
+          <tbody id="bulk-table-body"></tbody>
+          <tfoot id="bulk-table-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-bulk')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveBulk()">💾 บันทึกทั้งหมด</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="app.js"></script>
+<script>
+// ─── STATE ───────────────────────────────────────────────────
+let selectedPeriod = DateHelper.currentYM();
+let quickEntries   = {};   // { loanId: { checked, amount, interest, principal, balanceAfter } }
+let manInterestManual     = false;
+let manBalanceAfterManual = false;
+
+// ─── PAGE INIT ───────────────────────────────────────────────
+function pageInit() {
+  initTabs('#pay-tabs');
+  document.getElementById('selected-period').value = selectedPeriod;
+  populateManLoanSelect();
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+// ─── PERIOD ──────────────────────────────────────────────────
+function onPeriodChange() {
+  selectedPeriod = document.getElementById('selected-period').value;
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+function prevMonth() {
+  selectedPeriod = DateHelper.addMonths(selectedPeriod, -1);
+  document.getElementById('selected-period').value = selectedPeriod;
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+function nextMonth() {
+  selectedPeriod = DateHelper.addMonths(selectedPeriod, 1);
+  document.getElementById('selected-period').value = selectedPeriod;
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+function updatePeriodSummary() {
+  const payments = (DB.getPayments() || []).filter(p => p.period === selectedPeriod);
+  const loans    = (DB.getLoans()    || []).filter(l => l.status === 'active');
+  const totalAmt = payments.reduce((s, p) => s + (p.amount   || 0), 0);
+  const totalInt = payments.reduce((s, p) => s + (p.interest || 0), 0);
+  const el       = document.getElementById('period-summary');
+
+  el.innerHTML = payments.length === 0
+    ? `<span class="chip">ยังไม่มีการชำระ ${DateHelper.toThai(selectedPeriod)}</span>`
+    : `<div class="flex gap-12" style="flex-wrap:wrap">
+         <span class="chip">✅ ชำระแล้ว ${payments.length}/${loans.length} รายการ</span>
+         <span class="chip">💰 รวม ฿${Calc.fmt(totalAmt, 0)}</span>
+         <span class="chip" style="background:var(--danger-light);color:var(--danger)">📈 ดบ. ฿${Calc.fmt(totalInt, 0)}</span>
+       </div>`;
+  document.getElementById('payment-subtitle').textContent =
+    `เดือน ${DateHelper.toThai(selectedPeriod)} · ชำระแล้ว ${payments.length} จาก ${loans.length} รายการ`;
+}
+
+// ─── QUICK LIST ──────────────────────────────────────────────
+/**
+ * คำนวณ "ยอดคงเหลือ ณ ต้นเดือน period" สำหรับแต่ละ loan
+ *
+ * ลำดับความสำคัญ:
+ * 1. มี payment บันทึกไว้ก่อน period → ใช้ balanceAfter ของเดือนล่าสุดก่อน period (ค่าจริง)
+ * 2. ไม่มีก่อนหน้า แต่มี payment หลัง/เท่ากับ period → ย้อนกลับจาก earliest payment
+ * 3. ไม่มีประวัติเลย → project ไปข้างหน้าจาก "anchor" ที่ดีที่สุด
+ *    anchor = ยอด currentBalance ณ เดือนที่บันทึกล่าสุด (ถ้ามี) หรือ currentBalance ตอนนี้
+ *    แล้ว simulate ตามสูตรดอกเบี้ยจนถึง period นั้น
+ */
+function getBalanceAtPeriodStart(loan, period, allPayments) {
+  const loanPayments = allPayments.filter(p => p.loanId === loan.id);
+
+  // ── กรณีที่ 1: มี payment บันทึกก่อน period ──
+  const prior = loanPayments
+    .filter(p => DateHelper.compare(p.period, period) < 0)
+    .sort((a, b) => DateHelper.compare(b.period, a.period));
+
+  if (prior.length > 0) {
+    const latest = prior[0];
+    // ถ้าเดือนก่อนหน้าติดกัน ใช้ได้เลย
+    // ถ้ามีช่องว่าง (เดือน skip) → project ไปข้างหน้าจาก balanceAfter ของ latest
+    const gapMonths = monthDiff(latest.period, period);
+    if (gapMonths <= 1) return latest.balanceAfter;
+    // มีช่องว่าง → simulate ไปข้างหน้า
+    return simulateForward(latest.balanceAfter, loan, gapMonths - 1);
+  }
+
+  // ── กรณีที่ 2: ไม่มีก่อนหน้า แต่มี payment ที่ period นั้นเอง ──
+  const atPeriod = loanPayments.find(p => p.period === period);
+  if (atPeriod) {
+    return atPeriod.balanceAfter + atPeriod.principal;
+  }
+
+  // ── กรณีที่ 3: ไม่มีประวัติก่อนหน้าเลย → project จาก anchor ──
+  // หา anchor = payment ล่าสุดที่บันทึกไว้ (อาจเป็นเดือนหลัง period)
+  if (loanPayments.length > 0) {
+    const earliest = loanPayments.sort((a, b) => DateHelper.compare(a.period, b.period))[0];
+    // ย้อนกลับจาก earliest ไปถึง period
+    const monthsBack = monthDiff(period, earliest.period);
+    const balBeforeEarliest = earliest.balanceAfter + earliest.principal;
+    return simulateBackward(balBeforeEarliest, loan, monthsBack);
+  }
+
+  // ── ไม่มีประวัติเลย → หา anchor จาก currentBalance + currentYM แล้ว project ──
+  const currentYM = DateHelper.currentYM();
+  const diffFromNow = monthDiff(period, currentYM); // period → currentYM
+  if (diffFromNow === 0) return loan.currentBalance;
+  if (diffFromNow > 0) {
+    // period อยู่ก่อน currentYM → ย้อนกลับ
+    return simulateBackward(loan.currentBalance, loan, diffFromNow);
+  } else {
+    // period อยู่หลัง currentYM → ฉายไปข้างหน้า
+    return simulateForward(loan.currentBalance, loan, -diffFromNow);
+  }
+}
+
+/** จำลองการชำระไปข้างหน้า n เดือน จาก startBalance */
+function simulateForward(startBalance, loan, months) {
+  let b = startBalance;
+  for (let i = 0; i < months; i++) {
+    if (b <= 0) return 0;
+    const int  = Calc.monthlyInterest(b, loan.interestRate);
+    const prin = loan.monthlyPayment - int;
+    b = Math.max(b - Math.max(prin, 0), 0);
+  }
+  return b;
+}
+
+/** ย้อนกลับ n เดือน จาก startBalance (คำนวณย้อน) */
+function simulateBackward(startBalance, loan, months) {
+  let b = startBalance;
+  for (let i = 0; i < months; i++) {
+    const int  = Calc.monthlyInterest(b, loan.interestRate);
+    const prin = loan.monthlyPayment - int;
+    b = b + Math.max(prin, 0);
+  }
+  return b;
+}
+
+function monthDiff(from, to) {
+  const [fy, fm] = from.split('-').map(Number);
+  const [ty, tm] = to.split('-').map(Number);
+  return (ty - fy) * 12 + (tm - fm);
+}
+
+function renderQuickList() {
+  const loans      = (DB.getLoans()    || []).filter(l => l.status === 'active');
+  const allPayments = DB.getPayments() || [];
+  const payments   = allPayments.filter(p => p.period === selectedPeriod);
+  const paidMap    = Object.fromEntries(payments.map(p => [p.loanId, p]));
+  const el         = document.getElementById('quick-list');
+
+  // init entries — คำนวณยอดต้นเดือนสำหรับแต่ละ loan ที่ period นี้
+  quickEntries = {};
+  const isFuturePeriod = DateHelper.compare(selectedPeriod, DateHelper.currentYM()) > 0;
+
+  loans.forEach(loan => {
+    const balanceBefore = getBalanceAtPeriodStart(loan, selectedPeriod, allPayments);
+    const paid = paidMap[loan.id];
+
+    if (paid) {
+      // มีการบันทึกแล้ว → ใช้ค่าจริง
+      quickEntries[loan.id] = {
+        checked:       false,
+        amount:        paid.amount,
+        interest:      paid.interest,
+        principal:     paid.principal,
+        balanceAfter:  paid.balanceAfter,
+        balanceBefore,
+        _autoAfter:    paid.balanceAfter,
+        _editing:      false,
+        _isForecast:   false
+      };
+    } else {
+      // ยังไม่บันทึก → preview/คาดการณ์จากสูตร
+      const int   = Calc.monthlyInterest(balanceBefore, loan.interestRate);
+      const prin  = loan.monthlyPayment - int;
+      const after = Math.max(balanceBefore - Math.max(prin, 0), 0);
+      quickEntries[loan.id] = {
+        checked:       !isFuturePeriod, // future period ไม่ tick อัตโนมัติ
+        amount:        loan.monthlyPayment,
+        interest:      int,
+        principal:     prin,
+        balanceAfter:  after,
+        balanceBefore,
+        _autoAfter:    after,
+        _editing:      false,
+        _isForecast:   true  // คาดการณ์ ยังไม่บันทึกจริง
+      };
+    }
+  });
+
+  if (loans.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="emoji">💡</div><p>ไม่มีรายการที่กำลังชำระ</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    ${isFuturePeriod ? `
+    <div class="alert alert-warning" style="margin:12px 16px 0">
+      🔮 <strong>เดือนคาดการณ์</strong> — ยอดทั้งหมดเป็นการประมาณจากสูตรดอกเบี้ย ยังไม่ได้บันทึกจริง
+    </div>` : ''}
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px"><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" ${isFuturePeriod ? '' : 'checked'} /></th>
+          <th>รายการ</th>
+          <th class="text-right">คงเหลือก่อน</th>
+          <th class="text-right">ค่างวด (บาท)</th>
+          <th class="text-right">คงเหลือหลัง</th>
+          <th class="text-right">เงินต้น</th>
+          <th class="text-right">ดอกเบี้ย (บาท)</th>
+          <th>สถานะ / แก้ไข</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${loans.map(loan => renderQuickRow(loan, paidMap)).join('')}
+      </tbody>
+      <tfoot id="quick-tfoot"></tfoot>
+    </table>`;
+
+  updateQuickSummary();
+}
+
+function renderQuickRow(loan, paidMap) {
+  const e         = quickEntries[loan.id];
+  const paid      = paidMap[loan.id];
+  const isPaid    = !!paid;
+  const isEditing = isPaid && e._editing;
+  const isForecast = e._isForecast; // ยังไม่บันทึก (ทั้ง past และ future)
+
+  let rowBg = '';
+  if (isPaid && !isEditing) rowBg = 'background:var(--success-light)';
+  else if (isForecast)      rowBg = 'background:var(--warning-light)';
+
+  const prinCls = e.principal >= 0 ? 'green-text' : 'red-text';
+  const dis = (isPaid && !isEditing) ? 'disabled' : '';
+
+  return `
+  <tr id="qrow-${loan.id}" style="${rowBg}">
+    <td>
+      <input type="checkbox" id="qchk-${loan.id}"
+        ${(isPaid || isEditing) ? 'disabled' : (e.checked ? 'checked' : '')}
+        onchange="onQuickCheck('${loan.id}', this.checked)" />
+    </td>
+    <td>
+      <div class="flex gap-8" style="align-items:center">
+        <div style="width:8px;height:8px;border-radius:50%;background:${loan.color}"></div>
+        <span class="fw-600">${loan.name}</span>
+        ${isForecast ? `<span style="font-size:10px;color:var(--warning);font-weight:600">🔮คาดการณ์</span>` : ''}
+      </div>
+    </td>
+    <td class="num ${isForecast ? 'text-muted' : ''}">฿${Calc.fmt(e.balanceBefore)}</td>
+    <td style="text-align:right">
+      <input type="number" class="form-control" style="width:110px;text-align:right;padding:5px 8px;font-size:13px;display:inline-block"
+        id="qamt-${loan.id}" value="${e.amount.toFixed(2)}" ${dis}
+        oninput="onQuickAmountChange('${loan.id}', this.value)" />
+    </td>
+    <td style="text-align:right">
+      <input type="number" class="form-control" style="width:120px;text-align:right;padding:5px 8px;font-size:13px;display:inline-block"
+        id="qafter-${loan.id}" value="${e.balanceAfter.toFixed(2)}" ${dis}
+        oninput="onQuickAfterChange('${loan.id}', this.value)" />
+    </td>
+    <td class="num ${prinCls}" id="qprin-${loan.id}">฿${Calc.fmt(e.principal)}</td>
+    <td class="num red-text" id="qint-${loan.id}">฿${Calc.fmt(e.interest)}</td>
+    <td>
+      ${isPaid && !isEditing ? `
+        <div class="flex gap-8" style="align-items:center">
+          <span class="badge badge-paid">✅ ชำระแล้ว</span>
+          <button class="btn btn-ghost btn-sm" title="แก้ไข" onclick="startEditPaid('${loan.id}')">✏️</button>
+        </div>` : ''}
+      ${isPaid && isEditing ? `
+        <div class="flex gap-8" style="align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="saveEditPaid('${loan.id}')">💾 บันทึก</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelEditPaid('${loan.id}')">✕</button>
+        </div>` : ''}
+      ${!isPaid ? `
+        <span class="badge" style="background:var(--warning-light);color:var(--warning);font-weight:600">
+          🔮 คาดการณ์
+        </span>` : ''}
+    </td>
+  </tr>`;
+}
+
+function startEditPaid(loanId) {
+  quickEntries[loanId]._editing = true;
+  const loans   = DB.getLoans() || [];
+  const loan    = loans.find(l => l.id === loanId);
+  const paidMap = Object.fromEntries(
+    (DB.getPayments() || []).filter(p => p.period === selectedPeriod).map(p => [p.loanId, p])
+  );
+  const row = document.getElementById(`qrow-${loanId}`);
+  if (row) row.outerHTML = renderQuickRow(loan, paidMap);
+}
+
+function cancelEditPaid(loanId) {
+  quickEntries[loanId]._editing = false;
+  const loans   = DB.getLoans() || [];
+  const loan    = loans.find(l => l.id === loanId);
+  const paidMap = Object.fromEntries(
+    (DB.getPayments() || []).filter(p => p.period === selectedPeriod).map(p => [p.loanId, p])
+  );
+  const row = document.getElementById(`qrow-${loanId}`);
+  if (row) row.outerHTML = renderQuickRow(loan, paidMap);
+}
+
+function saveEditPaid(loanId) {
+  const amtInput   = parseFloat(document.getElementById(`qamt-${loanId}`)?.value)   || 0;
+  const afterInput = parseFloat(document.getElementById(`qafter-${loanId}`)?.value);
+  if (isNaN(afterInput)) { toast('กรุณากรอกคงเหลือหลัง', 'error'); return; }
+
+  const e           = quickEntries[loanId];
+  const balanceBefore = e.balanceBefore;
+  const principal   = balanceBefore - afterInput;
+  const interest    = amtInput - principal;
+
+  const payments = DB.getPayments() || [];
+  const loans    = DB.getLoans()    || [];
+  const pIdx     = payments.findIndex(p => p.loanId === loanId && p.period === selectedPeriod);
+
+  if (pIdx !== -1) {
+    payments[pIdx] = {
+      ...payments[pIdx],
+      amount:       amtInput,
+      interest,
+      principal,
+      balanceAfter: afterInput,
+      updatedAt:    new Date().toISOString()
+    };
+  }
+
+  // อัปเดต currentBalance ของ loan ถ้าเดือนนี้เป็นเดือนล่าสุด
+  const latestPeriod = (DB.getPayments() || [])
+    .filter(p => p.loanId === loanId)
+    .reduce((max, p) => DateHelper.compare(p.period, max) > 0 ? p.period : max, '0000-00');
+
+  if (selectedPeriod === latestPeriod || pIdx === -1) {
+    const lIdx = loans.findIndex(l => l.id === loanId);
+    if (lIdx !== -1) loans[lIdx].currentBalance = afterInput;
+  }
+
+  DB.savePayments(payments);
+  DB.saveLoans(loans);
+  toast('✅ แก้ไขเรียบร้อย', 'success');
+
+  quickEntries[loanId]._editing = false;
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+function toggleAll(checked) {
+  const loans = (DB.getLoans() || []).filter(l => l.status === 'active');
+  const paidIds = new Set((DB.getPayments() || []).filter(p => p.period === selectedPeriod).map(p => p.loanId));
+  loans.forEach(loan => {
+    if (!paidIds.has(loan.id)) {
+      const chk = document.getElementById(`qchk-${loan.id}`);
+      if (chk && !chk.disabled) { chk.checked = checked; quickEntries[loan.id].checked = checked; }
+    }
+  });
+  updateQuickSummary();
+}
+
+function onQuickCheck(loanId, checked) {
+  if (quickEntries[loanId]) quickEntries[loanId].checked = checked;
+  updateQuickSummary();
+}
+
+function onQuickAmountChange(loanId, val) {
+  const amount = parseFloat(val) || 0;
+  const loan   = (DB.getLoans() || []).find(l => l.id === loanId);
+  if (!loan) return;
+
+  const e           = quickEntries[loanId] || {};
+  const balBefore   = e.balanceBefore ?? loan.currentBalance;
+  const afterInput  = parseFloat(document.getElementById(`qafter-${loanId}`)?.value);
+  const intRate     = Calc.monthlyInterest(balBefore, loan.interestRate);
+
+  let balanceAfter, principal, interest;
+
+  if (!isNaN(afterInput) && afterInput !== e._autoAfter) {
+    // user กรอก balanceAfter เองไว้ → คำนวณย้อนกลับ
+    balanceAfter = afterInput;
+    principal    = balBefore - balanceAfter;
+    interest     = amount - principal;
+  } else {
+    // คำนวณจาก rate
+    principal    = amount - intRate;
+    balanceAfter = Math.max(balBefore - Math.max(principal, 0), 0);
+    interest     = intRate;
+    const afterEl = document.getElementById(`qafter-${loanId}`);
+    if (afterEl) afterEl.value = balanceAfter.toFixed(2);
+    quickEntries[loanId]._autoAfter = balanceAfter;
+  }
+
+  quickEntries[loanId] = { ...e, amount, interest, principal, balanceAfter };
+  const intEl  = document.getElementById(`qint-${loanId}`);
+  const prinEl = document.getElementById(`qprin-${loanId}`);
+  if (intEl)  intEl.textContent  = '฿' + Calc.fmt(interest);
+  if (prinEl) { prinEl.textContent = '฿' + Calc.fmt(principal); prinEl.className = `num ${principal >= 0 ? 'green-text' : 'red-text'}`; }
+  updateQuickSummary();
+}
+
+function onQuickAfterChange(loanId, val) {
+  const balanceAfter = parseFloat(val);
+  if (isNaN(balanceAfter)) return;
+  const loan = (DB.getLoans() || []).find(l => l.id === loanId);
+  if (!loan) return;
+
+  const e       = quickEntries[loanId] || {};
+  const balBefore = e.balanceBefore ?? loan.currentBalance;
+  const amount  = parseFloat(document.getElementById(`qamt-${loanId}`)?.value) || 0;
+  const principal = balBefore - balanceAfter;
+  const interest  = amount - principal;
+
+  quickEntries[loanId] = { ...e, balanceAfter, principal, interest, _autoAfter: null };
+
+  const intEl  = document.getElementById(`qint-${loanId}`);
+  const prinEl = document.getElementById(`qprin-${loanId}`);
+  if (intEl)  intEl.textContent  = '฿' + Calc.fmt(interest);
+  if (prinEl) { prinEl.textContent = '฿' + Calc.fmt(principal); prinEl.className = `num ${principal >= 0 ? 'green-text' : 'red-text'}`; }
+  updateQuickSummary();
+}
+
+function autoFillAll() {
+  const loans = (DB.getLoans() || []).filter(l => l.status === 'active');
+  const paidIds = new Set((DB.getPayments() || []).filter(p => p.period === selectedPeriod).map(p => p.loanId));
+  loans.forEach(loan => {
+    if (!paidIds.has(loan.id)) {
+      document.getElementById(`qamt-${loan.id}`).value = loan.monthlyPayment.toFixed(2);
+      onQuickAmountChange(loan.id, loan.monthlyPayment);
+      const chk = document.getElementById(`qchk-${loan.id}`);
+      if (chk && !chk.disabled) { chk.checked = true; quickEntries[loan.id].checked = true; }
+    }
+  });
+  updateQuickSummary();
+}
+
+function updateQuickSummary() {
+  const allEntries  = Object.entries(quickEntries);
+  const selected    = allEntries.filter(([, e]) => e.checked);
+  const allE        = allEntries; // ทุกแถว (รวม paid และ forecast)
+
+  // ── ยอดรวมที่เลือก (จะบันทึก) ──
+  const selAmt   = selected.reduce((s, [, e]) => s + e.amount,      0);
+  const selInt   = selected.reduce((s, [, e]) => s + e.interest,    0);
+  const selPrin  = selected.reduce((s, [, e]) => s + e.principal,   0);
+
+  // ── ยอดรวมทั้งหมดในตาราง ──
+  const totalBefore = allE.reduce((s, [, e]) => s + (e.balanceBefore || 0), 0);
+  const totalAmt    = allE.reduce((s, [, e]) => s + e.amount,   0);
+  const totalAfter  = allE.reduce((s, [, e]) => s + e.balanceAfter,  0);
+  const totalPrin   = allE.reduce((s, [, e]) => s + e.principal, 0);
+  const totalInt    = allE.reduce((s, [, e]) => s + e.interest,  0);
+
+  const loans = (DB.getLoans() || []).filter(l => l.status === 'active');
+  const paidLoanIds = new Set(
+    (DB.getPayments() || [])
+      .filter(p => p.period === selectedPeriod)
+      .map(p => p.loanId)
+  );
+  const paidN = paidLoanIds.size;
+
+  document.getElementById('quick-done-chip').textContent =
+    `${paidN}/${loans.length} ชำระแล้ว`;
+  document.getElementById('quick-summary-text').textContent =
+    selected.length > 0
+      ? `เลือก ${selected.length} รายการ · รวม ฿${Calc.fmt(selAmt,0)} · ดบ. ฿${Calc.fmt(selInt,0)} · เงินต้น ฿${Calc.fmt(selPrin,0)}`
+      : '';
+
+  // ── alert ──
+  const alertEl = document.getElementById('quick-total-alert');
+  if (selected.length > 0) {
+    alertEl.style.display = 'flex';
+    alertEl.innerHTML = `<span>💰</span><span>ที่เลือกจะบันทึก: <strong>฿${Calc.fmt(selAmt)}</strong> &nbsp;·&nbsp; ดอกเบี้ย: <strong style="color:var(--danger)">฿${Calc.fmt(selInt)}</strong> &nbsp;·&nbsp; เงินต้น: <strong style="color:var(--success)">฿${Calc.fmt(selPrin)}</strong></span>`;
+  } else {
+    alertEl.style.display = 'none';
+  }
+
+  // ── tfoot summary row ──
+  const tfoot = document.getElementById('quick-tfoot');
+  if (!tfoot) return;
+  const prinCls = totalPrin >= 0 ? 'green-text' : 'red-text';
+  tfoot.innerHTML = `
+    <tr style="background:var(--gray-50);border-top:2px solid var(--gray-300)">
+      <td colspan="2" style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">
+        รวมทั้งหมด (${allE.length} รายการ)
+      </td>
+      <td class="num fw-700" style="padding:10px 14px">฿${Calc.fmt(totalBefore, 0)}</td>
+      <td class="num fw-700" style="padding:10px 14px">฿${Calc.fmt(totalAmt, 0)}</td>
+      <td class="num fw-700" style="padding:10px 14px">฿${Calc.fmt(totalAfter, 0)}</td>
+      <td class="num fw-700 ${prinCls}" style="padding:10px 14px">฿${Calc.fmt(totalPrin, 0)}</td>
+      <td class="num fw-700 red-text" style="padding:10px 14px">฿${Calc.fmt(totalInt, 0)}</td>
+      <td style="padding:10px 14px"></td>
+    </tr>`;
+}
+
+function saveAllQuick() {
+  const selected = Object.entries(quickEntries).filter(([, e]) => e.checked && e.amount > 0);
+  if (selected.length === 0) { toast('กรุณาเลือกรายการที่จะบันทึก', 'error'); return; }
+
+  const loans    = DB.getLoans()    || [];
+  const now      = new Date().toISOString();
+
+  selected.forEach(([loanId, entry]) => {
+    // อ่าน balanceAfter จาก input จริง
+    const afterInput   = parseFloat(document.getElementById(`qafter-${loanId}`)?.value);
+    const balanceAfter = !isNaN(afterInput) ? afterInput : entry.balanceAfter;
+    const balanceBefore = entry.balanceBefore;
+
+    // สูตร: เงินต้น = ยอดก่อน - ยอดหลัง, ดอกเบี้ย = ค่างวด - เงินต้น
+    const principal = balanceBefore - balanceAfter;
+    const interest  = entry.amount - principal;
+
+    DB.upsertPayment({
+      id: genId('pay'), loanId, period: selectedPeriod,
+      amount:       entry.amount,
+      interest:     interest,
+      principal:    principal,
+      balanceAfter: balanceAfter,
+      notes:        '',
+      createdAt:    now
+    });
+    // Update loan balance
+    const idx = loans.findIndex(l => l.id === loanId);
+    if (idx !== -1) loans[idx].currentBalance = balanceAfter;
+  });
+
+  DB.saveLoans(loans);
+  toast(`✅ บันทึก ${selected.length} รายการ เดือน ${DateHelper.toThai(selectedPeriod)} เรียบร้อย`, 'success');
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+// ─── MANUAL FORM ─────────────────────────────────────────────
+function populateManLoanSelect() {
+  const loans = (DB.getLoans() || []).filter(l => l.status === 'active');
+  const sel   = document.getElementById('man-loan');
+  const cur   = sel.value;
+  sel.innerHTML = `<option value="">— เลือกรายการ —</option>` +
+    loans.map(l => `<option value="${l.id}" ${cur === l.id ? 'selected' : ''}>${l.name}</option>`).join('');
+}
+
+function onManLoanChange() {
+  const loanId  = document.getElementById('man-loan').value;
+  const loan    = (DB.getLoans() || []).find(l => l.id === loanId);
+  manInterestManual     = false;
+  manBalanceAfterManual = false;
+
+  if (!loan) {
+    document.getElementById('sidebar-loan-name').textContent   = '📊 ข้อมูลรายการ';
+    document.getElementById('sidebar-loan-detail').innerHTML   = `<div class="empty-state" style="padding:24px"><div class="emoji">☝️</div><p>เลือกรายการ</p></div>`;
+    document.getElementById('sidebar-recent').innerHTML        = `<div style="padding:20px;text-align:center;color:var(--gray-400)">เลือกรายการ</div>`;
+    document.getElementById('man-balance-before').value = '';
+    document.getElementById('man-amount').value         = '';
+    document.getElementById('man-interest').value       = '';
+    document.getElementById('man-balance-after').value  = '';
+    clearManCalc();
+    return;
+  }
+
+  // Pre-fill
+  document.getElementById('man-balance-before').value = loan.currentBalance;
+  document.getElementById('man-amount').value         = loan.monthlyPayment;
+  calcManual();
+  renderSidebar(loan);
+  renderSidebarRecent(loan.id);
+}
+
+function calcManual() {
+  const balance = parseFloat(document.getElementById('man-balance-before').value) || 0;
+  const amount  = parseFloat(document.getElementById('man-amount').value)         || 0;
+  const loanId  = document.getElementById('man-loan').value;
+  const loan    = (DB.getLoans() || []).find(l => l.id === loanId);
+  if (!loan || balance <= 0) { clearManCalc(); return; }
+
+  const balAfterInput = parseFloat(document.getElementById('man-balance-after').value);
+
+  let interest, principal, after;
+
+  if (manBalanceAfterManual && !isNaN(balAfterInput)) {
+    // สูตรใหม่: มี balanceAfter → คำนวณย้อนกลับ
+    after     = balAfterInput;
+    principal = balance - after;
+    interest  = amount - principal;
+  } else {
+    // ยังไม่กรอก balanceAfter → คำนวณจาก rate ก่อน
+    interest  = Calc.monthlyInterest(balance, loan.interestRate);
+    principal = amount - interest;
+    after     = Math.max(balance - Math.max(principal, 0), 0);
+  }
+
+  document.getElementById('man-disp-int').textContent   = '฿' + Calc.fmt(interest);
+  document.getElementById('man-disp-prin').textContent  = '฿' + Calc.fmt(principal);
+  document.getElementById('man-disp-prin').style.color  = principal >= 0 ? 'var(--success)' : 'var(--danger)';
+  document.getElementById('man-disp-after').textContent = '฿' + Calc.fmt(after);
+
+  if (!manInterestManual)     document.getElementById('man-interest').value     = interest.toFixed(2);
+  if (!manBalanceAfterManual) document.getElementById('man-balance-after').value = after.toFixed(2);
+}
+
+function onManInterestChange() {
+  manInterestManual = true;
+  const balance = parseFloat(document.getElementById('man-balance-before').value) || 0;
+  const amount  = parseFloat(document.getElementById('man-amount').value)         || 0;
+  const int     = parseFloat(document.getElementById('man-interest').value)       || 0;
+  const prin    = amount - int;
+  const after   = Math.max(balance - Math.max(prin, 0), 0);
+  document.getElementById('man-disp-prin').textContent  = '฿' + Calc.fmt(prin);
+  document.getElementById('man-disp-int').textContent   = '฿' + Calc.fmt(int);
+  document.getElementById('man-disp-after').textContent = '฿' + Calc.fmt(after);
+  if (!manBalanceAfterManual) document.getElementById('man-balance-after').value = after.toFixed(2);
+}
+
+function onManBalanceAfterChange() {
+  manBalanceAfterManual = true;
+  const balance = parseFloat(document.getElementById('man-balance-before').value) || 0;
+  const amount  = parseFloat(document.getElementById('man-amount').value)         || 0;
+  const after   = parseFloat(document.getElementById('man-balance-after').value);
+  if (isNaN(after)) return;
+  // สูตรใหม่: เงินต้น = ยอดก่อน - ยอดหลัง, ดอกเบี้ย = ค่างวด - เงินต้น
+  const principal = balance - after;
+  const interest  = amount - principal;
+  document.getElementById('man-disp-prin').textContent  = '฿' + Calc.fmt(principal);
+  document.getElementById('man-disp-prin').style.color  = principal >= 0 ? 'var(--success)' : 'var(--danger)';
+  document.getElementById('man-disp-int').textContent   = '฿' + Calc.fmt(interest);
+  document.getElementById('man-disp-after').textContent = '฿' + Calc.fmt(after);
+  if (!manInterestManual) document.getElementById('man-interest').value = interest.toFixed(2);
+}
+
+function clearManCalc() {
+  document.getElementById('man-disp-int').textContent   = '—';
+  document.getElementById('man-disp-prin').textContent  = '—';
+  document.getElementById('man-disp-after').textContent = '—';
+}
+
+function saveManual() {
+  const loanId    = document.getElementById('man-loan').value;
+  const amount    = parseFloat(document.getElementById('man-amount').value)         || 0;
+  const balBefore = parseFloat(document.getElementById('man-balance-before').value) || 0;
+  const balAfter  = parseFloat(document.getElementById('man-balance-after').value);
+  const notes     = document.getElementById('man-notes').value.trim();
+
+  if (!loanId)     { toast('กรุณาเลือกรายการ', 'error'); return; }
+  if (amount <= 0) { toast('กรุณากรอกค่างวด', 'error');      return; }
+
+  // ถ้ากรอก balanceAfter → ใช้สูตรใหม่
+  // ถ้าไม่ได้กรอก → ใช้สูตรดอกเบี้ยเดิม
+  let balanceAfter, principal, interest;
+  const loan = (DB.getLoans() || []).find(l => l.id === loanId);
+
+  if (manBalanceAfterManual && !isNaN(balAfter)) {
+    balanceAfter = balAfter;
+    principal    = balBefore - balanceAfter;
+    interest     = amount - principal;
+  } else {
+    const intRate = loan ? Calc.monthlyInterest(balBefore, loan.interestRate) : 0;
+    interest      = parseFloat(document.getElementById('man-interest').value) || intRate;
+    principal     = amount - interest;
+    balanceAfter  = isNaN(balAfter)
+      ? Math.max(balBefore - Math.max(principal, 0), 0)
+      : balAfter;
+  }
+
+  const loans    = DB.getLoans()    || [];
+
+  // มีรายการนี้ในเดือนนี้อยู่แล้วหรือยัง (จะเป็นการแก้ทับ ไม่ใช่เพิ่มใหม่)
+  const alreadyPaid = (DB.getPayments() || [])
+    .some(p => p.loanId === loanId && p.period === selectedPeriod);
+
+  DB.upsertPayment({
+    id: genId('pay'), loanId, period: selectedPeriod,
+    amount, interest, principal, balanceAfter, notes,
+    createdAt: new Date().toISOString()
+  });
+
+  const idx = loans.findIndex(l => l.id === loanId);
+  if (idx !== -1) loans[idx].currentBalance = balanceAfter;
+
+  DB.saveLoans(loans);
+
+  const loanName = loans.find(l => l.id === loanId)?.name || '';
+  toast(
+    alreadyPaid
+      ? `✏️ อัปเดต "${loanName}" เดือน ${DateHelper.toThai(selectedPeriod)} (ทับรายการเดิม)`
+      : `✅ บันทึก "${loanName}" เดือน ${DateHelper.toThai(selectedPeriod)} เรียบร้อย`,
+    'success'
+  );
+
+  // reset form
+  manInterestManual     = false;
+  manBalanceAfterManual = false;
+  document.getElementById('man-loan').value            = '';
+  document.getElementById('man-balance-before').value  = '';
+  document.getElementById('man-amount').value          = '';
+  document.getElementById('man-interest').value        = '';
+  document.getElementById('man-balance-after').value   = '';
+  document.getElementById('man-notes').value           = '';
+  clearManCalc();
+  renderSidebar(null);
+  populateManLoanSelect();
+  renderQuickList();
+  updatePeriodSummary();
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────
+function renderSidebar(loan) {
+  const nameEl   = document.getElementById('sidebar-loan-name');
+  const detailEl = document.getElementById('sidebar-loan-detail');
+  if (!loan) {
+    nameEl.textContent = '📊 ข้อมูลรายการ';
+    detailEl.innerHTML = `<div class="empty-state" style="padding:24px"><div class="emoji">☝️</div><p>เลือกรายการ</p></div>`;
+    return;
+  }
+  const pct    = Calc.progressPct(loan.originalAmount, loan.currentBalance);
+  const intNow = Calc.monthlyInterest(loan.currentBalance, loan.interestRate);
+  const months = Calc.monthsToPayoff(loan.currentBalance, loan.monthlyPayment, loan.interestRate);
+  nameEl.innerHTML = `<div style="width:10px;height:10px;border-radius:50%;background:${loan.color};display:inline-block;margin-right:6px"></div>${loan.name}`;
+  detailEl.innerHTML = `
+    <div style="display:grid;gap:10px">
+      <div><div class="text-xs text-muted">ยอดคงเหลือ</div>
+        <div class="fw-700" style="font-size:18px;color:var(--danger)">฿${Calc.fmt(loan.currentBalance)}</div></div>
+      <div class="progress-wrap"><div class="progress-bar blue" style="width:${pct}%"></div></div>
+      <div class="text-xs text-muted">ชำระแล้ว ${pct.toFixed(1)}% จาก ฿${Calc.fmt(loan.originalAmount)}</div>
+      <div class="divider"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="text-xs text-muted">ค่างวด/เดือน</div><div class="fw-600">฿${Calc.fmt(loan.monthlyPayment,0)}</div></div>
+        <div><div class="text-xs text-muted">ดอกเบี้ย/เดือน</div><div class="fw-600" style="color:var(--danger)">฿${Calc.fmt(intNow)}</div></div>
+        <div><div class="text-xs text-muted">อัตราดอกเบี้ย</div><div class="fw-600">${loan.interestRate.toFixed(4)}%/เดือน</div></div>
+        ${months ? `<div><div class="text-xs text-muted">คาดปิดใน</div><div class="fw-600">${months} เดือน</div></div>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderSidebarRecent(loanId) {
+  const payments = (DB.getPayments() || []).filter(p => p.loanId === loanId)
+    .sort((a, b) => DateHelper.compare(b.period, a.period)).slice(0, 10);
+  const el = document.getElementById('sidebar-recent');
+  if (payments.length === 0) {
+    el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gray-400)">ยังไม่มีประวัติ</div>`;
+    return;
+  }
+  el.innerHTML = payments.map(p => `
+    <div style="padding:10px 16px;border-bottom:1px solid var(--gray-100)">
+      <div class="flex-between">
+        <span class="fw-600 text-sm">${DateHelper.toThai(p.period)}</span>
+        <span class="text-sm fw-600">฿${Calc.fmt(p.amount,0)}</span>
+      </div>
+      <div class="flex gap-12 text-xs text-muted mt-8">
+        <span>ดบ. ฿${Calc.fmt(p.interest,0)}</span>
+        <span>ต้น ฿${Calc.fmt(p.principal,0)}</span>
+        <span>คงเหลือ ฿${Calc.fmt(p.balanceAfter,0)}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ─── BULK MODAL ──────────────────────────────────────────────
+function openBulkModal() {
+  const loans  = (DB.getLoans() || []).filter(l => l.status === 'active');
+  const paidSet = new Set((DB.getPayments() || []).filter(p => p.period === selectedPeriod).map(p => p.loanId));
+  const unpaid  = loans.filter(l => !paidSet.has(l.id));
+
+  document.getElementById('bulk-period-label').textContent = `เดือน ${DateHelper.toThai(selectedPeriod)}`;
+
+  if (unpaid.length === 0) {
+    toast(`เดือน ${DateHelper.toThai(selectedPeriod)} ชำระครบทุกรายการแล้ว!`, 'success');
+    return;
+  }
+
+  let totalAmt = 0, totalInt = 0, totalPrin = 0;
+  const rows = unpaid.map(loan => {
+    const int   = Calc.monthlyInterest(loan.currentBalance, loan.interestRate);
+    const prin  = loan.monthlyPayment - int;
+    const after = Math.max(loan.currentBalance - Math.max(prin, 0), 0);
+    totalAmt  += loan.monthlyPayment;
+    totalInt  += int;
+    totalPrin += prin;
+    return `<tr>
+      <td><div class="flex gap-8" style="align-items:center">
+        <div style="width:8px;height:8px;border-radius:50%;background:${loan.color}"></div>
+        <span class="fw-600">${loan.name}</span></div></td>
+      <td class="num">฿${Calc.fmt(loan.currentBalance)}</td>
+      <td class="num red-text">฿${Calc.fmt(int)}</td>
+      <td class="num">฿${Calc.fmt(loan.monthlyPayment)}</td>
+      <td class="num ${prin >= 0 ? 'green-text' : 'red-text'}">฿${Calc.fmt(prin)}</td>
+      <td class="num">฿${Calc.fmt(after)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('bulk-table-body').innerHTML = rows;
+  document.getElementById('bulk-table-foot').innerHTML = `
+    <tr style="background:var(--gray-50);font-weight:700">
+      <td colspan="2">รวม ${unpaid.length} รายการ</td>
+      <td class="num red-text">฿${Calc.fmt(totalInt)}</td>
+      <td class="num">฿${Calc.fmt(totalAmt)}</td>
+      <td class="num ${totalPrin >= 0 ? 'green-text' : 'red-text'}">฿${Calc.fmt(totalPrin)}</td>
+      <td></td>
+    </tr>`;
+
+  openModal('modal-bulk');
+}
+
+function saveBulk() {
+  const loans   = DB.getLoans()    || [];
+  const paidSet  = new Set((DB.getPayments() || []).filter(p => p.period === selectedPeriod).map(p => p.loanId));
+  const now      = new Date().toISOString();
+  let count      = 0;
+
+  loans.filter(l => l.status === 'active' && !paidSet.has(l.id)).forEach(loan => {
+    const int   = Calc.monthlyInterest(loan.currentBalance, loan.interestRate);
+    const prin  = loan.monthlyPayment - int;
+    const after = Math.max(loan.currentBalance - Math.max(prin, 0), 0);
+    DB.upsertPayment({
+      id: genId('pay'), loanId: loan.id, period: selectedPeriod,
+      amount: loan.monthlyPayment, interest: int, principal: prin,
+      balanceAfter: after, notes: 'bulk', createdAt: now
+    });
+    const idx = loans.findIndex(l => l.id === loan.id);
+    if (idx !== -1) loans[idx].currentBalance = after;
+    count++;
+  });
+
+  DB.saveLoans(loans);
+  closeModal('modal-bulk');
+  toast(`✅ บันทึก ${count} รายการ เดือน ${DateHelper.toThai(selectedPeriod)} เรียบร้อย`, 'success');
+  renderQuickList();
+  updatePeriodSummary();
+}
+</script>
+</body>
+</html>
