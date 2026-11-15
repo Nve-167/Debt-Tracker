@@ -637,57 +637,140 @@ function showSyncModal() {
     modal = document.createElement('div');
     modal.id = 'modal-sync';
     modal.className = 'modal-overlay';
-    modal.innerHTML = `
-      <div class="modal" style="max-width:400px">
-        <div class="modal-header">
-          <div class="modal-title">☁️ สถานะการซิงค์</div>
-          <button class="btn btn-ghost" onclick="closeModal('modal-sync')">✕</button>
-        </div>
-        <div class="modal-body" id="sync-modal-body">
-          <div style="text-align:center;padding:20px">⏳ กำลังตรวจสอบ...</div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="DB.forceSync('download').then(()=>{location.reload()})">⬇️ Download จาก Sheet</button>
-          <button class="btn btn-primary" onclick="DB.forceSync('upload')">⬆️ Upload ไป Sheet</button>
-        </div>
-      </div>
-    `;
     document.body.appendChild(modal);
   }
   
-  openModal('modal-sync');
+  const loans = DB.getLoans() || [];
+  const payments = DB.getPayments() || [];
   
-  // Check sync status
-  DB.checkSync().then(status => {
-    const body = document.getElementById('sync-modal-body');
-    if (!status.synced) {
-      body.innerHTML = `
-        <div class="alert alert-warning">
-          ⚠️ ${status.reason === 'offline' ? 'ยังไม่ได้ตั้งค่า Google Sheet' : 'เชื่อมต่อไม่ได้'}
+  modal.innerHTML = `
+    <div class="modal" style="max-width:450px">
+      <div class="modal-header">
+        <div class="modal-title">💾 ข้อมูล & Backup</div>
+        <button class="btn btn-ghost" onclick="closeModal('modal-sync')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="card" style="padding:16px;text-align:center;margin-bottom:16px;background:var(--gray-50)">
+          <div class="text-xs text-muted">📊 ข้อมูลปัจจุบัน</div>
+          <div class="fw-700" style="font-size:24px">${loans.length} รายการหนี้</div>
+          <div class="text-sm text-muted">${payments.length} ประวัติชำระ</div>
         </div>
-        <p class="text-sm text-muted">ดู README ในโฟลเดอร์ <code>google-apps-script</code> สำหรับวิธีตั้งค่า</p>
-      `;
-    } else {
-      body.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-          <div class="card" style="padding:16px;text-align:center">
-            <div class="text-xs text-muted">💾 Local</div>
-            <div class="fw-700">${status.local.loans} หนี้</div>
-            <div class="text-sm text-muted">${status.local.payments} ชำระ</div>
-          </div>
-          <div class="card" style="padding:16px;text-align:center">
-            <div class="text-xs text-muted">☁️ Google Sheet</div>
-            <div class="fw-700">${status.remote.loans} หนี้</div>
-            <div class="text-sm text-muted">${status.remote.payments} ชำระ</div>
-          </div>
+        
+        <div class="alert alert-info mb-16">
+          💡 <strong>แนะนำ:</strong> Export ข้อมูลเก็บไว้เป็นประจำ เผื่อต้องกู้คืน
         </div>
-        ${status.local.loans !== status.remote.loans || status.local.payments !== status.remote.payments
-          ? '<div class="alert alert-warning">⚠️ ข้อมูลไม่ตรงกัน — ควร sync</div>'
-          : '<div class="alert alert-success">✅ ข้อมูลตรงกัน</div>'
-        }
-      `;
+        
+        <div style="display:grid;gap:12px">
+          <button class="btn btn-primary w-full" onclick="exportData()">
+            📥 Export ข้อมูล (ดาวน์โหลด JSON)
+          </button>
+          <button class="btn btn-outline w-full" onclick="document.getElementById('import-file').click()">
+            📤 Import ข้อมูล (อัพโหลด JSON)
+          </button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)" />
+        </div>
+        
+        <hr style="margin:20px 0;border:none;border-top:1px solid var(--gray-200)">
+        
+        <button class="btn btn-ghost w-full" style="color:var(--danger)" onclick="confirmResetData()">
+          🗑️ ล้างข้อมูลทั้งหมด
+        </button>
+      </div>
+    </div>
+  `;
+  
+  openModal('modal-sync');
+}
+
+// ─── EXPORT DATA ─────────────────────────────────────────────
+function exportData() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    loans: DB.getLoans() || [],
+    payments: DB.getPayments() || []
+  };
+  
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `debt-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  toast('✅ Export สำเร็จ!', 'success');
+  closeModal('modal-sync');
+}
+
+// ─── IMPORT DATA ─────────────────────────────────────────────
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      
+      if (!data.loans || !Array.isArray(data.loans)) {
+        toast('❌ ไฟล์ไม่ถูกต้อง (ไม่พบข้อมูล loans)', 'error');
+        return;
+      }
+      
+      const confirmMsg = `📦 พบข้อมูล:\n` +
+        `• ${data.loans.length} รายการหนี้\n` +
+        `• ${(data.payments || []).length} ประวัติชำระ\n\n` +
+        `⚠️ ข้อมูลปัจจุบันจะถูกแทนที่ทั้งหมด\n` +
+        `ต้องการ Import หรือไม่?`;
+      
+      if (!confirm(confirmMsg)) return;
+      
+      // Clear cache and save
+      DB._cache.loans = null;
+      DB._cache.payments = null;
+      DB.saveLoans(data.loans);
+      DB.savePayments(data.payments || []);
+      
+      toast('✅ Import สำเร็จ!', 'success');
+      closeModal('modal-sync');
+      
+      // Reload page to refresh all data
+      setTimeout(() => location.reload(), 500);
+      
+    } catch (err) {
+      toast('❌ ไฟล์ JSON ไม่ถูกต้อง: ' + err.message, 'error');
     }
-  });
+  };
+  reader.readAsText(file);
+  
+  // Reset input
+  input.value = '';
+}
+
+// ─── RESET DATA ──────────────────────────────────────────────
+function confirmResetData() {
+  const confirmMsg = '⚠️ คุณแน่ใจหรือไม่?\n\n' +
+    'การกระทำนี้จะลบข้อมูลทั้งหมด:\n' +
+    '• รายการหนี้\n' +
+    '• ประวัติการชำระ\n\n' +
+    'ไม่สามารถกู้คืนได้!';
+  
+  if (!confirm(confirmMsg)) return;
+  if (!confirm('⚠️ ยืนยันอีกครั้ง — ลบข้อมูลทั้งหมด?')) return;
+  
+  localStorage.removeItem('dt_loans');
+  localStorage.removeItem('dt_payments');
+  DB._cache.loans = null;
+  DB._cache.payments = null;
+  
+  toast('🗑️ ลบข้อมูลเรียบร้อย', 'success');
+  closeModal('modal-sync');
+  setTimeout(() => location.reload(), 500);
 }
 
 // ─── INIT ────────────────────────────────────────────────────
