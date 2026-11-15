@@ -6,7 +6,7 @@
 
 // ─── CONFIGURATION ───────────────────────────────────────────
 // ⚠️ ใส่ URL ของ Google Apps Script ที่ deploy แล้วตรงนี้
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1QpyirqfHe7MZkv0dOd2V232jYibYcbkSG4gtrkZWCjjmQV0cQ7f8BDdVMNc5_MC5/exec'
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNpZzGCT7jUpNR4BrJQyvXrTXzS-eAvtzX2DL_dD4DhBUXtm8VcMo4yCzNyQzEo2ID/exec'
 
 // ─── SEED DATA (fallback ถ้ายังไม่มีข้อมูล) ──────────────────
 const SEED_LOANS = [
